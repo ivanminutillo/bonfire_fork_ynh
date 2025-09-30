@@ -104,11 +104,11 @@ ram.runtime = "1000M"
     autoupdate.asset = "tarball"
 
     [resources.apt]
-    packages = "postgresql postgresql-contrib postgresql-15-postgis-3 curl ca-certificates git imagemagick libvips-tools poppler-utils ffmpeg build-essential autoconf m4 libncurses5-dev libssh-dev unixodbc-dev libgmp3-dev libsctp-dev"
+    packages = "postgresql postgresql-contrib postgresql-15-postgis-3 curl ca-certificates git imagemagick libvips-tools poppler-utils ffmpeg build-essential autoconf m4 libncurses5-dev libssh-dev unixodbc-dev libgmp3-dev libsctp-dev erlang-dev erlang-parsetools erlang-os-mon erlang-tools erlang-xmerl npm node-postcss"
 
-    extras.erlang.repo = "deb https://packages.erlang-solutions.com/debian bullseye contrib"
-    extras.erlang.key = "https://packages.erlang-solutions.com/debian/erlang_solutions.asc"
-    extras.erlang.packages = ["esl-erlang=1:26.2.5.3-1", "elixir=1.17.3-1"]
+    extras.yarn.repo = "deb https://dl.yarnpkg.com/debian/ stable main"
+    extras.yarn.key = "https://dl.yarnpkg.com/debian/pubkey.gpg"
+    extras.yarn.packages = ["yarn"]
 
     extras.just.repo = "deb https://proget.makedeb.org prebuilt-mpr bookworm"
     extras.just.key = "https://proget.makedeb.org/debian-feeds/prebuilt-mpr.pub"
