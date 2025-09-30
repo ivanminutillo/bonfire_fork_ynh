@@ -83,8 +83,8 @@ signing_salt=$(ynh_string_random --length=64)
 encryption_salt=$(ynh_string_random --length=64)
 # search
 meili_master_key=$(ynh_string_random --length=64)
-# max file upload size
-MEDIA_UPLOAD_SIZE="${media_upload_size//[!0-9]/}000000"
+# max file upload size - convert from "35MB" to bytes "35000000"
+upload_limit_bytes="${media_upload_size//[!0-9]/}000000"
 
 ynh_script_progression --message="Adding a configuration file..." --weight=1
 
