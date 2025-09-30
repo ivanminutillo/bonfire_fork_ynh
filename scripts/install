@@ -10,96 +10,30 @@ source _common.sh
 source /usr/share/yunohost/helpers
 
 #=================================================
-# ENSURE LOCALE EXISTS FOR POSTGRESQL
+# INSTALL NODEJS
 #=================================================
-# PostgreSQL requires en_US.UTF-8 locale to be generated
-if ! locale -a | grep -q "en_US.utf8"; then
-    ynh_script_progression --message="Generating en_US.UTF-8 locale for PostgreSQL..." --weight=1
-    echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
-    locale-gen
-fi
+ynh_script_progression --message="Installing Node.js..." --weight=3
+
+ynh_exec_warn_less ynh_install_nodejs --nodejs_version=$nodejs_version
+ynh_use_nodejs
 
 #=================================================
-# FIX POSTGRESQL CLUSTER IF NOT CREATED
+# ENABLE POSTGRESQL EXTENSIONS
 #=================================================
-# If PostgreSQL was installed but cluster creation failed, create it manually
-if [ ! -d "/etc/postgresql/15/main" ]; then
-    if command -v pg_createcluster >/dev/null 2>&1; then
-        ynh_script_progression --message="Creating PostgreSQL cluster..." --weight=2
+ynh_script_progression --message="Enabling PostgreSQL extensions..." --weight=1
 
-        # Create the cluster with explicit locale
-        LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 pg_createcluster 15 main --start || {
-            # If that fails, try with C locale
-            ynh_print_warn "Failed to create cluster with en_US.UTF-8, trying with C locale..."
-            pg_createcluster 15 main --locale=C.UTF-8 --start || true
-        }
-
-        # Ensure PostgreSQL is running
-        systemctl enable postgresql 2>/dev/null || true
-        systemctl start postgresql 2>/dev/null || true
-        systemctl restart postgresql 2>/dev/null || true
-
-        # Wait for PostgreSQL to be ready
-        for i in {1..30}; do
-            if su - postgres -c "psql -c 'SELECT 1;'" >/dev/null 2>&1; then
-                ynh_print_info "PostgreSQL is ready"
-                break
-            fi
-            sleep 1
-        done
-    else
-        ynh_die "PostgreSQL is installed but pg_createcluster command not found"
-    fi
-fi
+ynh_psql_execute_as_root --sql="CREATE EXTENSION IF NOT EXISTS citext;" --database="$db_name"
+ynh_psql_execute_as_root --sql="CREATE EXTENSION IF NOT EXISTS postgis;" --database="$db_name"
 
 #=================================================
-# DOWNLOAD AND EXTRACT BONFIRE RELEASE
+# DOWNLOAD, CHECK AND UNPACK SOURCE
 #=================================================
-ynh_script_progression --message="Downloading Bonfire release..." --weight=5
+ynh_script_progression --message="Setting up source files..." --weight=5
 
-# Determine architecture for Docker image
-arch=$(uname -m)
-if [ "$arch" = "x86_64" ]; then
-    docker_image="bonfirenetworks/bonfire:latest-social-amd64"
-    meili_arch="amd64"
-elif [ "$arch" = "aarch64" ] || [ "$arch" = "arm64" ]; then
-    docker_image="bonfirenetworks/bonfire:latest-social-aarch64"
-    meili_arch="aarch64"
-else
-    ynh_die --message="Unsupported architecture: $arch"
-fi
+ynh_setup_source --dest_dir="$install_dir" --full_replace=1
 
-# Temporarily install Docker just to extract the release
-ynh_print_info "Installing Docker temporarily to extract Bonfire release..."
-apt-get install -y docker.io
-
-# Pull Docker image (we'll extract the release from it)
-docker pull "$docker_image"
-
-# Create temporary container to copy release from
-container_id=$(docker create "$docker_image")
-
-# Extract the OTP release
-docker cp "$container_id:/opt/app/." "$install_dir/"
-
-# Remove temporary container and image
-docker rm "$container_id"
-docker rmi "$docker_image"
-
-# Uninstall Docker
-ynh_print_info "Removing Docker (no longer needed)..."
-apt-get remove -y docker.io docker-compose
-apt-get autoremove -y
-
-#=================================================
-# INSTALL MEILISEARCH
-#=================================================
-ynh_script_progression --message="Installing Meilisearch..." --weight=3
-
-# Download and install Meilisearch
-meili_version="v1.14.0"
-curl -L "https://github.com/meilisearch/meilisearch/releases/download/$meili_version/meilisearch-linux-$meili_arch" -o "$install_dir/meilisearch"
-chmod +x "$install_dir/meilisearch"
+chmod -R o-rwx "$install_dir"
+chown -R $app:www-data "$install_dir"
 
 #=================================================
 # SETUP DIRECTORIES AND PERMISSIONS
@@ -110,8 +44,6 @@ ynh_script_progression --message="Setting up directories..." --weight=1
 mkdir -p "$data_dir/uploads"
 mkdir -p "$data_dir/meilisearch"
 
-chmod -R o-rwx "$install_dir"
-chown -R $app:www-data "$install_dir"
 chmod -R o-rwx "$data_dir"
 chown -R $app:www-data "$data_dir"
 
@@ -126,6 +58,8 @@ ynh_add_nginx_config
 #=================================================
 # ADD A CONFIGURATION
 #=================================================
+ynh_script_progression --message="Adding configuration..." --weight=1
+
 ## Generate secrets and other config values
 secret_key_base=$(ynh_string_random --length=64)
 signing_salt=$(ynh_string_random --length=64)
@@ -135,8 +69,6 @@ meili_master_key=$(ynh_string_random --length=64)
 # max file upload size - convert from "35MB" to bytes "35000000"
 upload_limit_bytes="${media_upload_size//[!0-9]/}000000"
 
-ynh_script_progression --message="Adding a configuration file..." --weight=1
-
 ynh_add_config --template="../conf/.env" --destination="$install_dir/.env"
 ynh_store_file_checksum --file="$install_dir/.env"
 
@@ -144,8 +76,58 @@ chmod 400 "$install_dir/.env"
 chown $app:$app "$install_dir/.env"
 
 #=================================================
+# INSTALL MEILISEARCH
+#=================================================
+ynh_script_progression --message="Installing Meilisearch..." --weight=3
+
+# Determine architecture
+arch=$(uname -m)
+if [ "$arch" = "x86_64" ]; then
+    meili_arch="amd64"
+elif [ "$arch" = "aarch64" ] || [ "$arch" = "arm64" ]; then
+    meili_arch="aarch64"
+else
+    ynh_die --message="Unsupported architecture: $arch"
+fi
+
+# Download and install Meilisearch
+meili_version="v1.14.0"
+curl -L "https://github.com/meilisearch/meilisearch/releases/download/$meili_version/meilisearch-linux-$meili_arch" -o "$install_dir/meilisearch"
+chmod +x "$install_dir/meilisearch"
+
+#=================================================
+# BUILD BONFIRE RELEASE
+#=================================================
+ynh_script_progression --message="Building Bonfire (this will take 15-30 minutes)..." --weight=50
+
+pushd "$install_dir"
+
+# Set environment for build
+export PATH="$nodejs_path:$PATH"
+export FLAVOUR=social
+export MIX_ENV=prod
+export WITH_DOCKER=no
+
+# Initialize Bonfire configuration
+ynh_exec_warn_less ynh_exec_as $app env PATH="$PATH" FLAVOUR=social MIX_ENV=prod WITH_DOCKER=no just config
+
+# Setup production environment (installs deps, compiles assets, etc.)
+ynh_exec_warn_less ynh_exec_as $app env PATH="$PATH" FLAVOUR=social MIX_ENV=prod WITH_DOCKER=no just setup-prod
+
+# Build the release
+ynh_exec_warn_less ynh_exec_as $app env PATH="$PATH" FLAVOUR=social MIX_ENV=prod WITH_DOCKER=no just rel-build
+
+popd
+
+# Check if build succeeded
+if [ ! -f "$install_dir/_build/prod/rel/bonfire/bin/bonfire" ]; then
+    ynh_die "Build failed - Bonfire binary not found"
+fi
+
+#=================================================
 # SETUP SYSTEMD SERVICES
 #=================================================
+ynh_script_progression --message="Configuring systemd services..." --weight=1
 
 mkdir -p "/var/log/$app"
 chown -R $app:$app "/var/log/$app"
@@ -162,37 +144,14 @@ ynh_add_systemd_config
 yunohost service add "meilisearch-$app" --description="Meilisearch for Bonfire" --log="/var/log/$app/meilisearch.log"
 yunohost service add $app --description="Bonfire daemon" --log="/var/log/$app/$app.log"
 
+#=================================================
+# START SERVICES
+#=================================================
 ynh_script_progression --message="Starting Meilisearch service..." --weight=1
 ynh_systemd_action --service_name="meilisearch-$app" --action="start" --log_path="/var/log/$app/meilisearch.log"
 
 ynh_script_progression --message="Starting Bonfire daemon service..." --weight=1
-
-# Start a systemd service
-ynh_systemd_action --service_name=$app --action="start" --log_path="/var/log/$app/$app.log"
-
-# Wait for Bonfire to be ready
-ynh_script_progression --message="Waiting for Bonfire to be ready..." --weight=5
-
-for i in {1..90}; do
-    if grep -q "Application bonfire started" "/var/log/$app/$app.log" 2>/dev/null; then
-        ynh_print_info "Bonfire application has started!"
-        break
-    fi
-    if [ $i -eq 90 ]; then
-        ynh_print_warn "Bonfire may not be fully ready yet, check logs: journalctl -u $app"
-    fi
-    sleep 2
-done
-
-#=================================================
-# RUN DATABASE MIGRATIONS
-#=================================================
-ynh_script_progression --message="Running database migrations..." --weight=3
-
-# Run migrations using the built-in migrate script
-pushd "$install_dir"
-su - $app -c "cd $install_dir && ./bin/migrate" || ynh_print_warn "Migrations may need to be run manually."
-popd
+ynh_systemd_action --service_name=$app --action="start" --log_path="/var/log/$app/$app.log" --line_match="Running Bonfire.Web.Endpoint"
 
 #=================================================
 # END OF SCRIPT

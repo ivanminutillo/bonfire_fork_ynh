@@ -7,14 +7,14 @@ Requires=meilisearch-__APP__.service
 Type=simple
 User=__APP__
 Group=__APP__
-WorkingDirectory=__INSTALL_DIR__/
+WorkingDirectory=__INSTALL_DIR__/_build/prod/rel/bonfire/
 Environment="HOME=__INSTALL_DIR__"
 Environment="MIX_ENV=prod"
 Environment="LANG=en_US.UTF-8"
 Environment="PORT=__PORT__"
 EnvironmentFile=__INSTALL_DIR__/.env
-ExecStart=__INSTALL_DIR__/bin/bonfire start
-ExecStop=__INSTALL_DIR__/bin/bonfire stop
+ExecStart=__INSTALL_DIR__/_build/prod/rel/bonfire/bin/bonfire start
+ExecStop=__INSTALL_DIR__/_build/prod/rel/bonfire/bin/bonfire stop
 Restart=on-failure
 RestartSec=10
 StandardOutput=append:/var/log/__APP__/__APP__.log

@@ -26,7 +26,7 @@ architectures = "all"
 ldap = false
 sso = false
 disk = "3000M"
-ram.build = "500M"
+ram.build = "2000M"
 ram.runtime = "1000M"
 
 [install]
@@ -95,8 +95,24 @@ ram.runtime = "1000M"
     [resources.permissions]
     main.url = "/"
 
+    [resources.sources]
+
+    [resources.sources.main]
+    url = "https://github.com/bonfire-networks/bonfire-app/archive/refs/tags/v1.0.0-rc.2.30.tar.gz"
+    sha256 = "d5558cd419c8d46bdc958064cb97f963d1ea793866414c025906ec15033512ed"
+    autoupdate.strategy = "latest_github_release"
+    autoupdate.asset = "tarball"
+
     [resources.apt]
-    packages = "postgresql postgresql-contrib curl ca-certificates git imagemagick libvips-tools poppler-utils ffmpeg"
+    packages = "postgresql postgresql-contrib postgresql-15-postgis-3 curl ca-certificates git imagemagick libvips-tools poppler-utils ffmpeg build-essential autoconf m4 libncurses5-dev libssh-dev unixodbc-dev libgmp3-dev libwxgtk3.0-gtk3-dev libwxgtk-webview3.0-gtk3-dev libsctp-dev"
+
+    extras.erlang.repo = "deb https://packages.erlang-solutions.com/debian bullseye contrib"
+    extras.erlang.key = "https://packages.erlang-solutions.com/debian/erlang_solutions.asc"
+    extras.erlang.packages = ["esl-erlang=1:26.2.5.3-1", "elixir=1.17.3-1"]
+
+    extras.just.repo = "deb https://download.opensuse.org/repositories/home:/MarkusFreitag:/just/Debian_12/ /"
+    extras.just.key = "https://download.opensuse.org/repositories/home:/MarkusFreitag:/just/Debian_12/Release.key"
+    extras.just.packages = ["just"]
 
     [resources.database]
     type = "postgresql"

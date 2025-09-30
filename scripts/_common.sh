@@ -4,7 +4,7 @@
 # COMMON VARIABLES
 #=================================================
 
-# Docker-based deployment - no additional variables needed
+nodejs_version=20
 
 #=================================================
 # PERSONAL HELPERS
