@@ -14,6 +14,11 @@ source /usr/share/yunohost/helpers
 #=================================================
 ynh_script_progression --message="Installing Elixir 1.17..." --weight=10
 
+# Ensure home directory exists with correct permissions
+mkdir -p "/home/$app"
+chown -R $app:$app "/home/$app"
+chmod 755 "/home/$app"
+
 # Install asdf version manager for the app user (Erlang comes from system packages)
 if [ ! -d "/home/$app/.asdf" ]; then
     ynh_exec_as $app git clone https://github.com/asdf-vm/asdf.git "/home/$app/.asdf" --branch v0.14.0
