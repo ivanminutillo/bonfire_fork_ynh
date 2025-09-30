@@ -95,8 +95,8 @@ ram.runtime = "1000M"
     [resources.permissions]
     main.url = "/"
 
+    [resources.apt]
+    packages = "locales-all docker.io docker-compose postgresql postgresql-contrib"
+
     [resources.database]
     type = "postgresql"
-
-    [resources.apt]
-    packages = "docker.io docker-compose"
