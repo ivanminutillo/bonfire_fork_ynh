@@ -64,6 +64,11 @@ ynh_add_config --template="../conf/docker-compose.yml" --destination="$install_d
 chmod 644 "$install_dir/docker-compose.yml"
 chown $app:$app "$install_dir/docker-compose.yml"
 
+# Update log collector script
+ynh_add_config --template="../conf/start-log-collector.sh" --destination="$install_dir/start-log-collector.sh"
+chmod 755 "$install_dir/start-log-collector.sh"
+chown $app:$app "$install_dir/start-log-collector.sh"
+
 #=================================================
 # REAPPLY SYSTEM CONFIGURATIONS
 #=================================================
@@ -86,7 +91,38 @@ yunohost service add $app --description="Bonfire daemon" --log="/var/log/$app/$a
 ynh_script_progression --message="Starting Bonfire daemon service..." --weight=1
 
 # Start a systemd service
-ynh_systemd_action --service_name=$app --action="start" --log_path="/var/log/$app/$app.log" --line_match="Running Bonfire.Web.Endpoint"
+ynh_systemd_action --service_name=$app --action="start"
+
+# Wait for containers to be running
+ynh_script_progression --message="Waiting for containers to start..." --weight=3
+
+sleep 5  # Give systemd time to start containers
+
+# Wait for Bonfire container to be running
+for i in {1..60}; do
+    if docker ps | grep -q "bonfire-$app"; then
+        ynh_print_info "Bonfire container is running"
+        break
+    fi
+    if [ $i -eq 60 ]; then
+        ynh_die "Bonfire container failed to start"
+    fi
+    sleep 2
+done
+
+# Wait for Bonfire to be ready (check logs for startup message)
+ynh_script_progression --message="Waiting for Bonfire to be ready..." --weight=5
+
+for i in {1..90}; do
+    if docker logs "bonfire-$app" 2>&1 | grep -q "Running Bonfire.Web.Endpoint"; then
+        ynh_print_info "Bonfire is ready!"
+        break
+    fi
+    if [ $i -eq 90 ]; then
+        ynh_print_warn "Bonfire may not be fully ready yet, check logs: docker logs bonfire-$app"
+    fi
+    sleep 2
+done
 
 #=================================================
 # END OF SCRIPT
