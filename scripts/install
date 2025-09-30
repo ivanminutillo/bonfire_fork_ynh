@@ -61,6 +61,9 @@ ynh_script_progression --message="Setting up source files..." --weight=5
 
 ynh_setup_source --dest_dir="$install_dir" --full_replace=1
 
+# Create .tool-versions file for asdf in the project directory
+echo "elixir 1.17.3-otp-25" > "$install_dir/.tool-versions"
+
 chmod -R o-rwx "$install_dir"
 chown -R $app:www-data "$install_dir"
 
