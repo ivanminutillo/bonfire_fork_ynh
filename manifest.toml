@@ -81,16 +81,16 @@ ram.runtime = "1000M"
 
 [resources]
 
+    [resources.system_user]
+    allow_email = true
+
+    [resources.install_dir]
+
     [resources.data_dir]
     # This will create/remove the data dir as /home/yunohost.app/$app
     # and store the corresponding setting $data_dir
 
     [resources.ports]
-
-    [resources.system_user]
-    allow_email = true
-
-    [resources.install_dir]
 
     [resources.permissions]
     main.url = "/"
