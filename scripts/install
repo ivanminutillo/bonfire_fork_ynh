@@ -142,6 +142,26 @@ if ! grep -q "172.17.0.0/16" /etc/postgresql/*/main/pg_hba.conf 2>/dev/null; the
 fi
 
 #=================================================
+# ENSURE DOCKER IS READY
+#=================================================
+ynh_script_progression --message="Ensuring Docker is ready..." --weight=1
+
+# Make sure Docker service is started and ready
+systemctl is-active docker.service || systemctl start docker.service
+
+# Wait for Docker socket to be available
+for i in {1..30}; do
+    if docker info >/dev/null 2>&1; then
+        ynh_print_info "Docker is ready"
+        break
+    fi
+    if [ $i -eq 30 ]; then
+        ynh_die "Docker failed to start"
+    fi
+    sleep 1
+done
+
+#=================================================
 # SETUP SYSTEMD SERVICE
 #=================================================
 
