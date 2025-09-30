@@ -1,0 +1,95 @@
+#!/bin/bash
+
+#=================================================
+# GENERIC START
+#=================================================
+# IMPORT GENERIC HELPERS
+#=================================================
+
+source _common.sh
+source /usr/share/yunohost/helpers
+
+upgrade_type=$(ynh_check_app_version_changed)
+
+# Get the Docker image setting
+docker_image=$(ynh_app_setting_get --app=$app --key=docker_image)
+
+#=================================================
+# STOP SYSTEMD SERVICE
+#=================================================
+ynh_script_progression --message="Stopping a systemd service..."
+
+ynh_systemd_action --service_name=$app --action="stop" --log_path="systemd"
+
+#=================================================
+# PULL NEW DOCKER IMAGE
+#=================================================
+
+if [ "$upgrade_type" == "UPGRADE_APP" ]
+then
+	ynh_script_progression --message="Updating Docker configuration..." --weight=5
+
+	# Determine architecture for Docker image
+	# Using the social flavor (full-featured)
+	arch=$(uname -m)
+	if [ "$arch" = "x86_64" ]; then
+	    docker_image="bonfirenetworks/bonfire:latest-social-amd64"
+	elif [ "$arch" = "aarch64" ] || [ "$arch" = "arm64" ]; then
+	    docker_image="bonfirenetworks/bonfire:latest-social-aarch64"
+	else
+	    ynh_die --message="Unsupported architecture: $arch"
+	fi
+
+	# Store the image name for later use
+	ynh_app_setting_set --app=$app --key=docker_image --value="$docker_image"
+fi
+
+# Ensure directories exist
+mkdir -p "$data_dir/uploads"
+mkdir -p "$data_dir/meilisearch"
+chown -R $app:www-data "$install_dir"
+chown -R $app:www-data "$data_dir"
+
+#=================================================
+# UPDATE CONFIGURATION
+#=================================================
+ynh_script_progression --message="Updating configuration files..." --weight=1
+
+ynh_add_config --template=".env" --destination="$install_dir/.env"
+chmod 400 "$install_dir/.env"
+chown $app:$app "$install_dir/.env"
+
+# Update docker-compose.yml
+ynh_add_config --template="../conf/docker-compose.yml" --destination="$install_dir/docker-compose.yml"
+chmod 644 "$install_dir/docker-compose.yml"
+chown $app:$app "$install_dir/docker-compose.yml"
+
+#=================================================
+# REAPPLY SYSTEM CONFIGURATIONS
+#=================================================
+ynh_script_progression --message="Upgrading system configurations related to $app..." --weight=1
+
+# Create a dedicated NGINX config
+ynh_add_nginx_config
+
+mkdir -p "/var/log/$app"
+chown -R $app:$app "/var/log/$app"
+
+# Use logrotate to manage app-specific logfile(s)
+ynh_use_logrotate --non-append
+
+# Create a dedicated systemd config
+ynh_add_systemd_config
+
+yunohost service add $app --description="Bonfire daemon" --log="/var/log/$app/$app.log"
+
+ynh_script_progression --message="Starting Bonfire daemon service..." --weight=1
+
+# Start a systemd service
+ynh_systemd_action --service_name=$app --action="start" --log_path="/var/log/$app/$app.log" --line_match="Running Bonfire.Web.Endpoint"
+
+#=================================================
+# END OF SCRIPT
+#=================================================
+
+ynh_script_progression --message="Upgrade of $app completed" --last

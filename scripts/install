@@ -1,0 +1,120 @@
+#!/bin/bash
+
+#=================================================
+# GENERIC START
+#=================================================
+# IMPORT GENERIC HELPERS
+#=================================================
+
+source _common.sh
+source /usr/share/yunohost/helpers
+
+#=================================================
+# SETUP DIRECTORIES AND PERMISSIONS
+#=================================================
+ynh_script_progression --message="Setting up directories..." --weight=1
+
+# Create data directories for uploads and meilisearch
+mkdir -p "$data_dir/uploads"
+mkdir -p "$data_dir/meilisearch"
+
+chmod -R o-rwx "$install_dir"
+chown -R $app:www-data "$install_dir"
+chmod -R o-rwx "$data_dir"
+chown -R $app:www-data "$data_dir"
+
+#=================================================
+# NGINX CONFIGURATION
+#=================================================
+ynh_script_progression --message="Configuring NGINX web server..." --weight=1
+
+# Create a dedicated NGINX config
+ynh_add_nginx_config
+
+#=================================================
+# ADD A CONFIGURATION
+#=================================================
+## Generate secrets and other config values
+secret_key_base=$(ynh_string_random --length=64)
+signing_salt=$(ynh_string_random --length=64)
+encryption_salt=$(ynh_string_random --length=64)
+# search
+meili_master_key=$(ynh_string_random --length=64)
+# max file upload size
+MEDIA_UPLOAD_SIZE="${media_upload_size//[!0-9]/}000000"
+
+ynh_script_progression --message="Adding a configuration file..." --weight=1
+
+ynh_add_config --template="../conf/.env" --destination="$install_dir/.env"
+ynh_store_file_checksum --file="$install_dir/.env"
+
+chmod 400 "$install_dir/.env"
+chown $app:$app "$install_dir/.env"
+
+#=================================================
+# CREATE DOCKER-COMPOSE CONFIGURATION
+#=================================================
+ynh_script_progression --message="Creating Docker Compose configuration..." --weight=1
+
+# Determine architecture for Docker image
+# Using the social flavor (full-featured)
+arch=$(uname -m)
+if [ "$arch" = "x86_64" ]; then
+    docker_image="bonfirenetworks/bonfire:latest-social-amd64"
+elif [ "$arch" = "aarch64" ] || [ "$arch" = "arm64" ]; then
+    docker_image="bonfirenetworks/bonfire:latest-social-aarch64"
+else
+    ynh_die --message="Unsupported architecture: $arch"
+fi
+
+# Store the image name for later use
+ynh_app_setting_set --app=$app --key=docker_image --value="$docker_image"
+
+# Create docker-compose.yml from template
+ynh_add_config --template="../conf/docker-compose.yml" --destination="$install_dir/docker-compose.yml"
+
+chmod 644 "$install_dir/docker-compose.yml"
+chown $app:$app "$install_dir/docker-compose.yml"
+
+#=================================================
+# CONFIGURE POSTGRESQL FOR DOCKER ACCESS
+#=================================================
+ynh_script_progression --message="Configuring PostgreSQL for Docker access..." --weight=1
+
+# Allow PostgreSQL to accept connections from Docker bridge network
+# This is needed for the container to connect to the host's PostgreSQL
+ynh_psql_execute_as_root --sql="ALTER SYSTEM SET listen_addresses = 'localhost,172.17.0.1';"
+ynh_psql_execute_as_root --sql="SELECT pg_reload_conf();"
+
+# Add pg_hba.conf rule for Docker network (if not already present)
+if ! grep -q "172.17.0.0/16" /etc/postgresql/*/main/pg_hba.conf 2>/dev/null; then
+    echo "host    all             all             172.17.0.0/16           scram-sha-256" >> /etc/postgresql/*/main/pg_hba.conf
+    systemctl reload postgresql
+fi
+
+#=================================================
+# SETUP SYSTEMD SERVICE
+#=================================================
+
+mkdir -p "/var/log/$app"
+chown -R $app:$app "/var/log/$app"
+
+# Use logrotate to manage application logfile(s)
+ynh_use_logrotate
+
+# Create a dedicated systemd config
+ynh_add_systemd_config
+
+yunohost service add $app --description="Bonfire daemon" --log="/var/log/$app/$app.log"
+
+ynh_script_progression --message="Starting Bonfire daemon service..." --weight=1
+
+# Start a systemd service
+ynh_systemd_action --service_name=$app --action="start" --log_path="/var/log/$app/$app.log" --line_match="Running Bonfire.Web.Endpoint"
+
+#=================================================
+# END OF SCRIPT
+#=================================================
+
+ynh_script_progression --message="Installation of $app completed" --weight=1
+ynh_script_progression --message="Now you need to sign-up, the first account will automatically be admin." --last

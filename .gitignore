@@ -1,0 +1,13 @@
+# Local testing data
+test-data/
+*.log
+
+# Temporary files
+*~
+.DS_Store
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo

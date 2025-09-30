@@ -1,0 +1,81 @@
+version: "3.8"
+
+# Local testing docker-compose - simulates YunoHost environment
+# Usage: docker compose -f docker-compose.local-test.yml up
+
+services:
+  db:
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=bonfire
+      - POSTGRES_PASSWORD=bonfire_test_password
+      - POSTGRES_DB=bonfire
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - bonfire_test
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bonfire"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    image: bonfirenetworks/bonfire:latest-social-amd64
+    depends_on:
+      db:
+        condition: service_healthy
+      search:
+        condition: service_started
+    environment:
+      - MIX_ENV=prod
+      - FLAVOUR=social
+      - HOSTNAME=localhost
+      - PUBLIC_PORT=4000
+      - LANG=en_US.UTF-8
+      - REPLACE_OS_VARS=true
+      - LIVEVIEW_ENABLED=true
+      - APP_NAME=Bonfire
+      - INVITE_ONLY=false
+      - DISABLE_DB_AUTOMIGRATION=false
+      - POSTGRES_HOST=db
+      - POSTGRES_USER=bonfire
+      - POSTGRES_DB=bonfire
+      - POSTGRES_PASSWORD=bonfire_test_password
+      - SECRET_KEY_BASE=test_secret_key_base_min_64_chars_aaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      - SIGNING_SALT=test_signing_salt_min_64_chars_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      - ENCRYPTION_SALT=test_encryption_salt_min_64_chars_aaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      - MEILI_MASTER_KEY=test_meili_key_min_64_chars_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      - SEARCH_MEILI_INSTANCE=http://search:7700
+      - UPLOAD_LIMIT=20000000
+      - MAIL_BACKEND=test
+      - ERLANG_COOKIE=bonfire_test_cookie
+    volumes:
+      - ./test-data/uploads:/opt/app/data/uploads
+    ports:
+      - "4000:4000"
+    networks:
+      - bonfire_test
+    command: ./bin/bonfire start
+
+  search:
+    image: getmeili/meilisearch:v1.14
+    environment:
+      - MEILI_MASTER_KEY=test_meili_key_min_64_chars_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      - MEILI_NO_ANALYTICS=true
+      - MEILI_ENV=development
+    volumes:
+      - ./test-data/meilisearch:/meili_data
+    networks:
+      - bonfire_test
+    ports:
+      - "7700:7700"
+
+volumes:
+  postgres-data:
+
+networks:
+  bonfire_test:
+    driver: bridge

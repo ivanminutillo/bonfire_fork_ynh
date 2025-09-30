@@ -1,0 +1,62 @@
+version: "3.8"
+
+services:
+  app:
+    image: __DOCKER_IMAGE__
+    container_name: bonfire-__APP__
+    depends_on:
+      - search
+    environment:
+      - MIX_ENV=prod
+      - FLAVOUR=social
+      - HOSTNAME=__DOMAIN__
+      - PUBLIC_PORT=443
+      - LANG=en_US.UTF-8
+      - REPLACE_OS_VARS=true
+      - LIVEVIEW_ENABLED=true
+      - APP_NAME=Bonfire
+      - INVITE_ONLY=true
+      - DISABLE_DB_AUTOMIGRATION=false
+      - POSTGRES_HOST=172.17.0.1
+      - POSTGRES_USER=__APP__
+      - POSTGRES_DB=__APP__
+      - POSTGRES_PASSWORD=__DB_PWD__
+      - SECRET_KEY_BASE=__SECRET_KEY_BASE__
+      - SIGNING_SALT=__SIGNING_SALT__
+      - ENCRYPTION_SALT=__ENCRYPTION_SALT__
+      - MEILI_MASTER_KEY=__MEILI_MASTER_KEY__
+      - SEARCH_MEILI_INSTANCE=http://search:7700
+      - UPLOAD_LIMIT=__MEDIA_UPLOAD_SIZE__
+      - MAIL_BACKEND=smtp
+      - MAIL_DOMAIN=__DOMAIN__
+      - MAIL_USER=__APP__
+      - MAIL_PASSWORD=__MAIL_PWD__
+      - MAIL_SERVER=localhost
+      - MAIL_PORT=25
+      - ERLANG_COOKIE=__APP___bonfire_cookie
+    volumes:
+      - __DATA_DIR__/uploads:/opt/app/data/uploads
+    ports:
+      - "127.0.0.1:__PORT__:4000"
+    networks:
+      - bonfire_net
+    restart: always
+    command: ./bin/bonfire start
+
+  search:
+    image: getmeili/meilisearch:v1.14
+    container_name: bonfire-__APP__-search
+    environment:
+      - MEILI_MASTER_KEY=__MEILI_MASTER_KEY__
+      - MEILI_NO_ANALYTICS=true
+      - MEILI_ENV=production
+    volumes:
+      - __DATA_DIR__/meilisearch:/meili_data
+    networks:
+      - bonfire_net
+    restart: always
+
+networks:
+  bonfire_net:
+    name: bonfire-__APP__-net
+    driver: bridge

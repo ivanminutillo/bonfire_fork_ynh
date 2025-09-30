@@ -1,0 +1,20 @@
+[Unit]
+Description=Bonfire daemon
+After=network.target docker.service postgresql.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=root
+Group=root
+WorkingDirectory=__INSTALL_DIR__/
+ExecStartPre=/usr/bin/docker compose -f __INSTALL_DIR__/docker-compose.yml pull
+ExecStart=/usr/bin/docker compose -f __INSTALL_DIR__/docker-compose.yml up -d
+ExecStop=/usr/bin/docker compose -f __INSTALL_DIR__/docker-compose.yml down
+ExecReload=/usr/bin/docker compose -f __INSTALL_DIR__/docker-compose.yml restart
+StandardOutput=append:/var/log/__APP__/__APP__.log
+StandardError=inherit
+
+[Install]
+WantedBy=multi-user.target
