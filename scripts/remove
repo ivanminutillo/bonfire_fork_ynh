@@ -15,12 +15,12 @@ source /usr/share/yunohost/helpers
 ynh_script_progression --message="Stopping and removing Docker containers..." --weight=1
 
 # Stop log collector process
-pkill -f "docker compose.*logs -f.*$app" 2>/dev/null || true
+pkill -f "docker-compose.*logs" 2>/dev/null || true
 
 # Stop and remove containers using docker-compose
 if [ -f "$install_dir/docker-compose.yml" ]; then
     cd "$install_dir"
-    docker compose -f docker-compose.yml down -v 2>/dev/null || true
+    docker-compose -f docker-compose.yml down -v 2>/dev/null || true
 fi
 
 # Fallback: manually stop containers if compose fails

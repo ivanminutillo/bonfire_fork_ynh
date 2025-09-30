@@ -147,16 +147,23 @@ fi
 ynh_script_progression --message="Ensuring Docker is ready..." --weight=1
 
 # Make sure Docker service is started and ready
-systemctl is-active docker.service || systemctl start docker.service
+if ! systemctl is-active --quiet docker.service; then
+    ynh_print_info "Starting Docker service..."
+    systemctl start docker.service
+    sleep 3
+fi
 
 # Wait for Docker socket to be available
+ynh_print_info "Waiting for Docker daemon to be ready..."
 for i in {1..30}; do
     if docker info >/dev/null 2>&1; then
-        ynh_print_info "Docker is ready"
+        ynh_print_info "Docker is ready!"
         break
     fi
     if [ $i -eq 30 ]; then
-        ynh_die "Docker failed to start"
+        ynh_print_err "Docker daemon not responding after 30 seconds"
+        systemctl status docker.service || true
+        ynh_die "Docker failed to start - check Docker service status"
     fi
     sleep 1
 done
