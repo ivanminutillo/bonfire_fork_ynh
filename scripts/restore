@@ -36,32 +36,6 @@ ynh_script_progression --message="Restoring the PostgreSQL database..." --weight
 ynh_psql_connect_as --user=$db_user --password=$db_pwd --database=$db_name < ./db.sql
 
 #=================================================
-# PULL DOCKER IMAGE
-#=================================================
-ynh_script_progression --message="Pulling Bonfire Docker image..." --weight=5
-
-# Get the Docker image setting
-docker_image=$(ynh_app_setting_get --app=$app --key=docker_image)
-
-if [ -z "$docker_image" ]; then
-	# Determine architecture for Docker image if not set
-	# Using the social flavor (full-featured)
-	arch=$(uname -m)
-	if [ "$arch" = "x86_64" ]; then
-	    docker_image="bonfirenetworks/bonfire:latest-social-amd64"
-	elif [ "$arch" = "aarch64" ] || [ "$arch" = "arm64" ]; then
-	    docker_image="bonfirenetworks/bonfire:latest-social-aarch64"
-	else
-	    ynh_die --message="Unsupported architecture: $arch"
-	fi
-	ynh_app_setting_set --app=$app --key=docker_image --value="$docker_image"
-fi
-
-# Ensure meilisearch directory exists
-mkdir -p "$data_dir/meilisearch"
-chown -R $app:www-data "$data_dir"
-
-#=================================================
 # RESTORE SYSTEM CONFIGURATIONS
 #=================================================
 ynh_script_progression --message="Restoring system configurations related to $app..." --weight=1
@@ -71,85 +45,23 @@ ynh_restore_file --origin_path="/etc/nginx/conf.d/$domain.d/$app.conf"
 ynh_restore_file --origin_path="/etc/systemd/system/$app.service"
 systemctl enable $app.service --quiet
 
+ynh_restore_file --origin_path="/etc/systemd/system/meilisearch-$app.service"
+systemctl enable "meilisearch-$app.service" --quiet
+
 mkdir -p "/var/log/$app"
 chown -R $app:$app "/var/log/$app"
 ynh_restore_file --origin_path="/etc/logrotate.d/$app"
 
+yunohost service add "meilisearch-$app" --description="Meilisearch for Bonfire" --log="/var/log/$app/meilisearch.log"
 yunohost service add $app --description="Bonfire daemon" --log="/var/log/$app/$app.log"
 
 #=================================================
-# ENSURE DOCKER IS READY
+# RELOAD NGINX AND START SERVICES
 #=================================================
-ynh_script_progression --message="Ensuring Docker is ready..." --weight=1
+ynh_script_progression --message="Reloading NGINX web server and starting services..." --weight=1
 
-# Make sure Docker service is started and ready
-if ! systemctl is-active --quiet docker.service; then
-    ynh_print_info "Starting Docker service..."
-    systemctl start docker.service
-    sleep 3
-fi
-
-# Wait for Docker socket to be available
-ynh_print_info "Waiting for Docker daemon to be ready..."
-for i in {1..30}; do
-    if docker info >/dev/null 2>&1; then
-        ynh_print_info "Docker is ready!"
-        break
-    fi
-    if [ $i -eq 30 ]; then
-        ynh_print_err "Docker daemon not responding after 30 seconds"
-        systemctl status docker.service || true
-        ynh_die "Docker failed to start - check Docker service status"
-    fi
-    sleep 1
-done
-
-#=================================================
-# START SYSTEMD SERVICE
-#=================================================
-ynh_script_progression --message="Starting Bonfire daemon service..." --weight=1
-
-ynh_systemd_action --service_name=$app --action="start"
-
-# Wait for containers to be running
-ynh_script_progression --message="Waiting for containers to start..." --weight=3
-
-sleep 5  # Give systemd time to start containers
-
-# Wait for Bonfire container to be running
-for i in {1..60}; do
-    if docker ps | grep -q "bonfire-$app"; then
-        ynh_print_info "Bonfire container is running"
-        break
-    fi
-    if [ $i -eq 60 ]; then
-        ynh_die "Bonfire container failed to start"
-    fi
-    sleep 2
-done
-
-# Wait for Bonfire to be ready (check logs for startup message)
-ynh_script_progression --message="Waiting for Bonfire to be ready..." --weight=5
-
-for i in {1..90}; do
-    if docker logs "bonfire-$app" 2>&1 | grep -q "Running Bonfire.Web.Endpoint"; then
-        ynh_print_info "Bonfire is ready!"
-        break
-    fi
-    if [ $i -eq 90 ]; then
-        ynh_print_warn "Bonfire may not be fully ready yet, check logs: docker logs bonfire-$app"
-    fi
-    sleep 2
-done
-
-ynh_systemd_action --service_name=nginx --action=reload
-
-#=================================================
-# GENERIC FINALIZATION
-#=================================================
-# RELOAD NGINX AND PHP-FPM OR THE APP SERVICE
-#=================================================
-ynh_script_progression --message="Reloading NGINX web server and $app's service..." --weight=1
+ynh_systemd_action --service_name="meilisearch-$app" --action="start" --log_path="/var/log/$app/meilisearch.log"
+ynh_systemd_action --service_name=$app --action="start" --log_path="/var/log/$app/$app.log"
 
 ynh_systemd_action --service_name=nginx --action=reload
 

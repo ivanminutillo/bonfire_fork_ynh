@@ -1,23 +1,40 @@
 [Unit]
-Description=Bonfire daemon
-After=network.target docker.service postgresql.service
-Requires=docker.service
+Description=Bonfire social networking server
+After=network.target postgresql.service meilisearch-__APP__.service
+Requires=meilisearch-__APP__.service
 
 [Service]
-Type=oneshot
-RemainAfterExit=yes
-User=root
-Group=root
+Type=simple
+User=__APP__
+Group=__APP__
 WorkingDirectory=__INSTALL_DIR__/
-TimeoutStartSec=1800
-ExecStartPre=/usr/bin/docker-compose -f __INSTALL_DIR__/docker-compose.yml pull --quiet
-ExecStart=/usr/bin/docker-compose -f __INSTALL_DIR__/docker-compose.yml up -d
-ExecStartPost=/bin/bash __INSTALL_DIR__/start-log-collector.sh
-ExecStop=/usr/bin/docker-compose -f __INSTALL_DIR__/docker-compose.yml down
-ExecStopPost=-/usr/bin/pkill -f "docker-compose.*logs"
-ExecReload=/usr/bin/docker-compose -f __INSTALL_DIR__/docker-compose.yml restart
+Environment="HOME=__INSTALL_DIR__"
+Environment="MIX_ENV=prod"
+Environment="LANG=en_US.UTF-8"
+Environment="PORT=__PORT__"
+EnvironmentFile=__INSTALL_DIR__/.env
+ExecStart=__INSTALL_DIR__/bin/bonfire start
+ExecStop=__INSTALL_DIR__/bin/bonfire stop
+Restart=on-failure
+RestartSec=10
 StandardOutput=append:/var/log/__APP__/__APP__.log
 StandardError=inherit
+SyslogIdentifier=__APP__
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=__DATA_DIR__ /var/log/__APP__
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
 
 [Install]
 WantedBy=multi-user.target

@@ -53,6 +53,55 @@ if [ ! -d "/etc/postgresql/15/main" ]; then
 fi
 
 #=================================================
+# DOWNLOAD AND EXTRACT BONFIRE RELEASE
+#=================================================
+ynh_script_progression --message="Downloading Bonfire release..." --weight=5
+
+# Determine architecture for Docker image
+arch=$(uname -m)
+if [ "$arch" = "x86_64" ]; then
+    docker_image="bonfirenetworks/bonfire:latest-social-amd64"
+    meili_arch="amd64"
+elif [ "$arch" = "aarch64" ] || [ "$arch" = "arm64" ]; then
+    docker_image="bonfirenetworks/bonfire:latest-social-aarch64"
+    meili_arch="aarch64"
+else
+    ynh_die --message="Unsupported architecture: $arch"
+fi
+
+# Temporarily install Docker just to extract the release
+ynh_print_info "Installing Docker temporarily to extract Bonfire release..."
+apt-get install -y docker.io
+
+# Pull Docker image (we'll extract the release from it)
+docker pull "$docker_image"
+
+# Create temporary container to copy release from
+container_id=$(docker create "$docker_image")
+
+# Extract the OTP release
+docker cp "$container_id:/opt/app/." "$install_dir/"
+
+# Remove temporary container and image
+docker rm "$container_id"
+docker rmi "$docker_image"
+
+# Uninstall Docker
+ynh_print_info "Removing Docker (no longer needed)..."
+apt-get remove -y docker.io docker-compose
+apt-get autoremove -y
+
+#=================================================
+# INSTALL MEILISEARCH
+#=================================================
+ynh_script_progression --message="Installing Meilisearch..." --weight=3
+
+# Download and install Meilisearch
+meili_version="v1.14.0"
+curl -L "https://github.com/meilisearch/meilisearch/releases/download/$meili_version/meilisearch-linux-$meili_arch" -o "$install_dir/meilisearch"
+chmod +x "$install_dir/meilisearch"
+
+#=================================================
 # SETUP DIRECTORIES AND PERMISSIONS
 #=================================================
 ynh_script_progression --message="Setting up directories..." --weight=1
@@ -95,81 +144,7 @@ chmod 400 "$install_dir/.env"
 chown $app:$app "$install_dir/.env"
 
 #=================================================
-# CREATE DOCKER-COMPOSE CONFIGURATION
-#=================================================
-ynh_script_progression --message="Creating Docker Compose configuration..." --weight=1
-
-# Determine architecture for Docker image
-# Using the social flavor (full-featured)
-arch=$(uname -m)
-if [ "$arch" = "x86_64" ]; then
-    docker_image="bonfirenetworks/bonfire:latest-social-amd64"
-elif [ "$arch" = "aarch64" ] || [ "$arch" = "arm64" ]; then
-    docker_image="bonfirenetworks/bonfire:latest-social-aarch64"
-else
-    ynh_die --message="Unsupported architecture: $arch"
-fi
-
-# Store the image name for later use
-ynh_app_setting_set --app=$app --key=docker_image --value="$docker_image"
-
-# Create docker-compose.yml from template
-ynh_add_config --template="../conf/docker-compose.yml" --destination="$install_dir/docker-compose.yml"
-
-chmod 644 "$install_dir/docker-compose.yml"
-chown $app:$app "$install_dir/docker-compose.yml"
-
-# Create log collector script
-ynh_add_config --template="../conf/start-log-collector.sh" --destination="$install_dir/start-log-collector.sh"
-
-chmod 755 "$install_dir/start-log-collector.sh"
-chown $app:$app "$install_dir/start-log-collector.sh"
-
-#=================================================
-# CONFIGURE POSTGRESQL FOR DOCKER ACCESS
-#=================================================
-ynh_script_progression --message="Configuring PostgreSQL for Docker access..." --weight=1
-
-# Allow PostgreSQL to accept connections from Docker bridge network
-# This is needed for the container to connect to the host's PostgreSQL
-ynh_psql_execute_as_root --sql="ALTER SYSTEM SET listen_addresses = 'localhost,172.17.0.1';"
-ynh_psql_execute_as_root --sql="SELECT pg_reload_conf();"
-
-# Add pg_hba.conf rule for Docker network (if not already present)
-if ! grep -q "172.17.0.0/16" /etc/postgresql/*/main/pg_hba.conf 2>/dev/null; then
-    echo "host    all             all             172.17.0.0/16           scram-sha-256" >> /etc/postgresql/*/main/pg_hba.conf
-    systemctl reload postgresql
-fi
-
-#=================================================
-# ENSURE DOCKER IS READY
-#=================================================
-ynh_script_progression --message="Ensuring Docker is ready..." --weight=1
-
-# Make sure Docker service is started and ready
-if ! systemctl is-active --quiet docker.service; then
-    ynh_print_info "Starting Docker service..."
-    systemctl start docker.service
-    sleep 3
-fi
-
-# Wait for Docker socket to be available
-ynh_print_info "Waiting for Docker daemon to be ready..."
-for i in {1..30}; do
-    if docker info >/dev/null 2>&1; then
-        ynh_print_info "Docker is ready!"
-        break
-    fi
-    if [ $i -eq 30 ]; then
-        ynh_print_err "Docker daemon not responding after 30 seconds"
-        systemctl status docker.service || true
-        ynh_die "Docker failed to start - check Docker service status"
-    fi
-    sleep 1
-done
-
-#=================================================
-# SETUP SYSTEMD SERVICE
+# SETUP SYSTEMD SERVICES
 #=================================================
 
 mkdir -p "/var/log/$app"
@@ -178,46 +153,46 @@ chown -R $app:$app "/var/log/$app"
 # Use logrotate to manage application logfile(s)
 ynh_use_logrotate
 
-# Create a dedicated systemd config
+# Create Meilisearch systemd service
+ynh_add_systemd_config --service="meilisearch-$app" --template="meilisearch.service"
+
+# Create Bonfire systemd config
 ynh_add_systemd_config
 
+yunohost service add "meilisearch-$app" --description="Meilisearch for Bonfire" --log="/var/log/$app/meilisearch.log"
 yunohost service add $app --description="Bonfire daemon" --log="/var/log/$app/$app.log"
+
+ynh_script_progression --message="Starting Meilisearch service..." --weight=1
+ynh_systemd_action --service_name="meilisearch-$app" --action="start" --log_path="/var/log/$app/meilisearch.log"
 
 ynh_script_progression --message="Starting Bonfire daemon service..." --weight=1
 
 # Start a systemd service
-ynh_systemd_action --service_name=$app --action="start"
+ynh_systemd_action --service_name=$app --action="start" --log_path="/var/log/$app/$app.log"
 
-# Wait for containers to be running
-ynh_script_progression --message="Waiting for containers to start..." --weight=3
-
-sleep 5  # Give systemd time to start containers
-
-# Wait for Bonfire container to be running
-for i in {1..60}; do
-    if docker ps | grep -q "bonfire-$app"; then
-        ynh_print_info "Bonfire container is running"
-        break
-    fi
-    if [ $i -eq 60 ]; then
-        ynh_die "Bonfire container failed to start"
-    fi
-    sleep 2
-done
-
-# Wait for Bonfire to be ready (check logs for startup message)
+# Wait for Bonfire to be ready
 ynh_script_progression --message="Waiting for Bonfire to be ready..." --weight=5
 
 for i in {1..90}; do
-    if docker logs "bonfire-$app" 2>&1 | grep -q "Running Bonfire.Web.Endpoint"; then
-        ynh_print_info "Bonfire is ready!"
+    if grep -q "Application bonfire started" "/var/log/$app/$app.log" 2>/dev/null; then
+        ynh_print_info "Bonfire application has started!"
         break
     fi
     if [ $i -eq 90 ]; then
-        ynh_print_warn "Bonfire may not be fully ready yet, check logs: docker logs bonfire-$app"
+        ynh_print_warn "Bonfire may not be fully ready yet, check logs: journalctl -u $app"
     fi
     sleep 2
 done
+
+#=================================================
+# RUN DATABASE MIGRATIONS
+#=================================================
+ynh_script_progression --message="Running database migrations..." --weight=3
+
+# Run migrations using the built-in migrate script
+pushd "$install_dir"
+su - $app -c "cd $install_dir && ./bin/migrate" || ynh_print_warn "Migrations may need to be run manually."
+popd
 
 #=================================================
 # END OF SCRIPT

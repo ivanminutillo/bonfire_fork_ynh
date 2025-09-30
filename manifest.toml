@@ -96,7 +96,7 @@ ram.runtime = "1000M"
     main.url = "/"
 
     [resources.apt]
-    packages = "locales-all apparmor docker.io docker-compose postgresql postgresql-contrib"
+    packages = "postgresql postgresql-contrib curl ca-certificates git imagemagick libvips-tools poppler-utils ffmpeg"
 
     [resources.database]
     type = "postgresql"

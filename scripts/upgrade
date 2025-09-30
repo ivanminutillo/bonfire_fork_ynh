@@ -11,37 +11,69 @@ source /usr/share/yunohost/helpers
 
 upgrade_type=$(ynh_check_app_version_changed)
 
-# Get the Docker image setting
-docker_image=$(ynh_app_setting_get --app=$app --key=docker_image)
-
 #=================================================
-# STOP SYSTEMD SERVICE
+# STOP SYSTEMD SERVICES
 #=================================================
-ynh_script_progression --message="Stopping a systemd service..."
+ynh_script_progression --message="Stopping systemd services..."
 
 ynh_systemd_action --service_name=$app --action="stop" --log_path="systemd"
+ynh_systemd_action --service_name="meilisearch-$app" --action="stop" --log_path="systemd"
 
 #=================================================
-# PULL NEW DOCKER IMAGE
+# UPDATE BONFIRE RELEASE
 #=================================================
 
 if [ "$upgrade_type" == "UPGRADE_APP" ]
 then
-	ynh_script_progression --message="Updating Docker configuration..." --weight=5
+	ynh_script_progression --message="Updating Bonfire release..." --weight=5
 
-	# Determine architecture for Docker image
-	# Using the social flavor (full-featured)
+	# Determine architecture
 	arch=$(uname -m)
 	if [ "$arch" = "x86_64" ]; then
 	    docker_image="bonfirenetworks/bonfire:latest-social-amd64"
+	    meili_arch="amd64"
 	elif [ "$arch" = "aarch64" ] || [ "$arch" = "arm64" ]; then
 	    docker_image="bonfirenetworks/bonfire:latest-social-aarch64"
+	    meili_arch="aarch64"
 	else
 	    ynh_die --message="Unsupported architecture: $arch"
 	fi
 
-	# Store the image name for later use
-	ynh_app_setting_set --app=$app --key=docker_image --value="$docker_image"
+	# Temporarily install Docker to extract new release
+	ynh_print_info "Installing Docker temporarily to extract new Bonfire release..."
+	apt-get install -y docker.io
+
+	# Pull new image
+	docker pull "$docker_image"
+
+	# Create temporary container
+	container_id=$(docker create "$docker_image")
+
+	# Backup current release
+	mv "$install_dir" "$install_dir.backup"
+
+	# Extract new release
+	mkdir -p "$install_dir"
+	docker cp "$container_id:/opt/app/." "$install_dir/"
+
+	# Restore configuration
+	cp "$install_dir.backup/.env" "$install_dir/.env"
+
+	# Remove temporary container and image
+	docker rm "$container_id"
+	docker rmi "$docker_image"
+
+	# Clean up Docker
+	apt-get remove -y docker.io
+	apt-get autoremove -y
+
+	# Remove backup
+	rm -rf "$install_dir.backup"
+
+	# Update Meilisearch
+	meili_version="v1.14.0"
+	curl -L "https://github.com/meilisearch/meilisearch/releases/download/$meili_version/meilisearch-linux-$meili_arch" -o "$install_dir/meilisearch"
+	chmod +x "$install_dir/meilisearch"
 fi
 
 # Ensure directories exist
@@ -51,105 +83,57 @@ chown -R $app:www-data "$install_dir"
 chown -R $app:www-data "$data_dir"
 
 #=================================================
-# UPDATE CONFIGURATION
+# UPDATE A CONFIGURATION
 #=================================================
-ynh_script_progression --message="Updating configuration files..." --weight=1
+ynh_script_progression --message="Updating a configuration file..."
 
-ynh_add_config --template=".env" --destination="$install_dir/.env"
+ynh_add_config --template="../conf/.env" --destination="$install_dir/.env"
+ynh_store_file_checksum --file="$install_dir/.env"
+
 chmod 400 "$install_dir/.env"
 chown $app:$app "$install_dir/.env"
-
-# Update docker-compose.yml
-ynh_add_config --template="../conf/docker-compose.yml" --destination="$install_dir/docker-compose.yml"
-chmod 644 "$install_dir/docker-compose.yml"
-chown $app:$app "$install_dir/docker-compose.yml"
-
-# Update log collector script
-ynh_add_config --template="../conf/start-log-collector.sh" --destination="$install_dir/start-log-collector.sh"
-chmod 755 "$install_dir/start-log-collector.sh"
-chown $app:$app "$install_dir/start-log-collector.sh"
 
 #=================================================
 # REAPPLY SYSTEM CONFIGURATIONS
 #=================================================
 ynh_script_progression --message="Upgrading system configurations related to $app..." --weight=1
 
-# Create a dedicated NGINX config
-ynh_add_nginx_config
+# Create Meilisearch service (if not exists)
+ynh_add_systemd_config --service="meilisearch-$app" --template="meilisearch.service"
 
-mkdir -p "/var/log/$app"
-chown -R $app:$app "/var/log/$app"
-
-# Use logrotate to manage app-specific logfile(s)
-ynh_use_logrotate --non-append
-
-# Create a dedicated systemd config
+# Create/update Bonfire service
 ynh_add_systemd_config
 
-yunohost service add $app --description="Bonfire daemon" --log="/var/log/$app/$app.log"
+ynh_add_nginx_config
+
+ynh_use_logrotate --non-append
 
 #=================================================
-# ENSURE DOCKER IS READY
+# START SYSTEMD SERVICES
 #=================================================
-ynh_script_progression --message="Ensuring Docker is ready..." --weight=1
+ynh_script_progression --message="Starting systemd services..." --weight=1
 
-# Make sure Docker service is started and ready
-if ! systemctl is-active --quiet docker.service; then
-    ynh_print_info "Starting Docker service..."
-    systemctl start docker.service
-    sleep 3
+# Start Meilisearch first
+ynh_systemd_action --service_name="meilisearch-$app" --action="start" --log_path="/var/log/$app/meilisearch.log"
+
+# Start Bonfire
+ynh_systemd_action --service_name=$app --action="start" --log_path="/var/log/$app/$app.log"
+
+#=================================================
+# RUN DATABASE MIGRATIONS
+#=================================================
+if [ "$upgrade_type" == "UPGRADE_APP" ]
+then
+	ynh_script_progression --message="Running database migrations..." --weight=3
+
+	# Wait for app to be ready
+	sleep 10
+
+	# Run migrations
+	pushd "$install_dir"
+	su - $app -c "cd $install_dir && ./bin/migrate" || ynh_print_warn "Migrations may need to be run manually."
+	popd
 fi
-
-# Wait for Docker socket to be available
-ynh_print_info "Waiting for Docker daemon to be ready..."
-for i in {1..30}; do
-    if docker info >/dev/null 2>&1; then
-        ynh_print_info "Docker is ready!"
-        break
-    fi
-    if [ $i -eq 30 ]; then
-        ynh_print_err "Docker daemon not responding after 30 seconds"
-        systemctl status docker.service || true
-        ynh_die "Docker failed to start - check Docker service status"
-    fi
-    sleep 1
-done
-
-ynh_script_progression --message="Starting Bonfire daemon service..." --weight=1
-
-# Start a systemd service
-ynh_systemd_action --service_name=$app --action="start"
-
-# Wait for containers to be running
-ynh_script_progression --message="Waiting for containers to start..." --weight=3
-
-sleep 5  # Give systemd time to start containers
-
-# Wait for Bonfire container to be running
-for i in {1..60}; do
-    if docker ps | grep -q "bonfire-$app"; then
-        ynh_print_info "Bonfire container is running"
-        break
-    fi
-    if [ $i -eq 60 ]; then
-        ynh_die "Bonfire container failed to start"
-    fi
-    sleep 2
-done
-
-# Wait for Bonfire to be ready (check logs for startup message)
-ynh_script_progression --message="Waiting for Bonfire to be ready..." --weight=5
-
-for i in {1..90}; do
-    if docker logs "bonfire-$app" 2>&1 | grep -q "Running Bonfire.Web.Endpoint"; then
-        ynh_print_info "Bonfire is ready!"
-        break
-    fi
-    if [ $i -eq 90 ]; then
-        ynh_print_warn "Bonfire may not be fully ready yet, check logs: docker logs bonfire-$app"
-    fi
-    sleep 2
-done
 
 #=================================================
 # END OF SCRIPT
