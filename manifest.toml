@@ -104,7 +104,7 @@ ram.runtime = "1000M"
     autoupdate.asset = "tarball"
 
     [resources.apt]
-    packages = "postgresql postgresql-contrib postgresql-15-postgis-3 curl ca-certificates git imagemagick libvips-tools poppler-utils ffmpeg build-essential autoconf m4 libncurses5-dev libssh-dev unixodbc-dev libgmp3-dev libsctp-dev erlang-dev erlang-parsetools erlang-os-mon erlang-tools erlang-xmerl npm node-postcss"
+    packages = "postgresql postgresql-contrib postgresql-15-postgis-3 curl ca-certificates git imagemagick libvips-tools poppler-utils ffmpeg build-essential autoconf m4 libncurses5-dev libssh-dev unixodbc-dev libgmp3-dev libsctp-dev erlang-dev erlang-parsetools erlang-os-mon erlang-tools erlang-xmerl erlang-asn1 erlang-public-key erlang-ssl erlang-crypto erlang-inets npm node-postcss"
 
     extras.yarn.repo = "deb https://dl.yarnpkg.com/debian/ stable main"
     extras.yarn.key = "https://dl.yarnpkg.com/debian/pubkey.gpg"
