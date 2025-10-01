@@ -116,11 +116,8 @@ meili_master_key=$(ynh_string_random --length=64)
 # max file upload size - convert from "35MB" to bytes "35000000"
 upload_limit_bytes="${media_upload_size//[!0-9]/}000000"
 
-ynh_add_config --template="../conf/.env" --destination="$install_dir/.env"
-ynh_store_file_checksum --file="$install_dir/.env"
-
-chmod 400 "$install_dir/.env"
-chown $app:$app "$install_dir/.env"
+# Note: .env file will be created after 'just config' runs, as that command
+# deletes .env and creates a symlink to config/prod/.env
 
 #=================================================
 # INSTALL MEILISEARCH
@@ -158,8 +155,13 @@ export MIX_ENV=prod
 export WITH_DOCKER=no
 export AUTO_YES=true
 
-# Initialize Bonfire configuration
+# Initialize Bonfire configuration (this creates config/prod/.env and symlinks .env to it)
 ynh_exec_warn_less ynh_exec_as $app env ASDF_DIR="$ASDF_DIR" ASDF_DATA_DIR="$ASDF_DATA_DIR" PATH="$PATH" FLAVOUR=social MIX_ENV=prod WITH_DOCKER=no AUTO_YES=true just config
+
+# Now create our .env configuration (just config created the symlink, so we write to the real file)
+ynh_add_config --template="../conf/.env" --destination="$install_dir/config/prod/.env"
+chmod 400 "$install_dir/config/prod/.env"
+chown $app:$app "$install_dir/config/prod/.env"
 
 # Run build steps manually to patch install scripts between deps fetch and flavour install
 ynh_exec_warn_less ynh_exec_as $app env ASDF_DIR="$ASDF_DIR" ASDF_DATA_DIR="$ASDF_DATA_DIR" PATH="$PATH" FLAVOUR=social MIX_ENV=prod WITH_DOCKER=no just build
