@@ -16,10 +16,12 @@ Environment="ASDF_DIR=/home/__APP__/.asdf"
 Environment="ASDF_DATA_DIR=/home/__APP__/.asdf"
 Environment="PATH=/home/__APP__/.asdf/shims:/home/__APP__/.asdf/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 EnvironmentFile=__INSTALL_DIR__/.env
-ExecStart=/bin/sh -c 'exec __INSTALL_DIR__/_build/prod/rel/bonfire/bin/bonfire start'
-KillMode=mixed
+ExecStart=__INSTALL_DIR__/_build/prod/rel/bonfire/bin/bonfire daemon_iex
+ExecStop=__INSTALL_DIR__/_build/prod/rel/bonfire/bin/bonfire stop
+KillMode=process
 KillSignal=SIGTERM
 TimeoutStopSec=30
+StandardInput=null
 Restart=on-failure
 RestartSec=10
 TimeoutStartSec=300
