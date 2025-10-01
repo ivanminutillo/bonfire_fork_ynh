@@ -88,3 +88,55 @@ name = "Bonfire configuration"
         help.en = "Maximum file upload size (e.g., 35MB, 100MB)"
         help.fr = "Taille maximale des fichiers uploadés (ex: 35MB, 100MB)"
         bind = "UPLOAD_LIMIT:__INSTALL_DIR__/.env"
+
+        [main.instance.app_name]
+        ask.en = "Instance name"
+        ask.fr = "Nom de l'instance"
+        type = "string"
+        default = "Bonfire"
+        help.en = "Name of your Bonfire instance"
+        help.fr = "Nom de votre instance Bonfire"
+        bind = "APP_NAME:__INSTALL_DIR__/.env"
+
+        [main.instance.log_level]
+        ask.en = "Log level"
+        ask.fr = "Niveau de log"
+        type = "select"
+        choices = ["emergency", "alert", "critical", "error", "warning", "notice", "info", "debug"]
+        default = "info"
+        help.en = "Logging verbosity level. Use 'info' for production, 'debug' for troubleshooting."
+        help.fr = "Niveau de verbosité des logs. Utilisez 'info' en production, 'debug' pour le dépannage."
+        bind = "LOG_LEVEL:__INSTALL_DIR__/.env"
+
+[advanced]
+name = "Advanced settings"
+
+    [advanced.features]
+    name = "Feature flags"
+
+        [advanced.features.with_image_vix]
+        ask.en = "Enable image processing (ImageMagick)"
+        ask.fr = "Activer le traitement d'images (ImageMagick)"
+        type = "boolean"
+        default = true
+        help.en = "Enable advanced image processing with ImageMagick (VIX). Recommended."
+        help.fr = "Activer le traitement d'images avancé avec ImageMagick (VIX). Recommandé."
+        bind = "WITH_IMAGE_VIX:__INSTALL_DIR__/.env"
+
+        [advanced.features.with_ai]
+        ask.en = "Enable AI features"
+        ask.fr = "Activer les fonctionnalités IA"
+        type = "boolean"
+        default = false
+        help.en = "Enable AI-powered features (requires more resources)"
+        help.fr = "Activer les fonctionnalités IA (nécessite plus de ressources)"
+        bind = "WITH_AI:__INSTALL_DIR__/.env"
+
+        [advanced.features.with_lv_native]
+        ask.en = "Enable LiveView native"
+        ask.fr = "Activer LiveView natif"
+        type = "boolean"
+        default = false
+        help.en = "Enable LiveView native support (experimental)"
+        help.fr = "Activer le support LiveView natif (expérimental)"
+        bind = "WITH_LV_NATIVE:__INSTALL_DIR__/.env"
