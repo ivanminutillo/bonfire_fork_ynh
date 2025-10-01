@@ -39,17 +39,6 @@ ynh_remove_logrotate
 ynh_secure_remove --file="/var/log/$app"
 
 #=================================================
-# CLEANUP MUSL SYMLINKS
-#=================================================
-# Remove musl symlinks if they were created by this app
-if [ -L /lib/ld-musl-x86_64.so.1 ]; then
-    rm -f /lib/ld-musl-x86_64.so.1
-fi
-if [ -L /lib/ld-musl-aarch64.so.1 ]; then
-    rm -f /lib/ld-musl-aarch64.so.1
-fi
-
-#=================================================
 # END OF SCRIPT
 #=================================================
 
