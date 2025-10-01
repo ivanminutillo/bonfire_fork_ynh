@@ -64,6 +64,10 @@ ynh_setup_source --dest_dir="$install_dir" --full_replace=1
 # Create .tool-versions file for asdf in the project directory
 echo "elixir 1.17.3-otp-25" > "$install_dir/.tool-versions"
 
+# Patch install scripts to respect AUTO_YES environment variable
+sed -i 's/^AUTO_YES=false$/AUTO_YES=${AUTO_YES:-false}/' "$install_dir/extensions/social/install.sh" || true
+sed -i 's/^AUTO_YES=false$/AUTO_YES=${AUTO_YES:-false}/' "$install_dir/extensions/ember/install.sh" || true
+
 # Set ownership FIRST so the bonfire user can initialize git
 chown -R $app:www-data "$install_dir"
 
