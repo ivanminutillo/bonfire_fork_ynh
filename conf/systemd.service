@@ -4,7 +4,7 @@ After=network.target postgresql.service meilisearch-__APP__.service
 Requires=meilisearch-__APP__.service
 
 [Service]
-Type=forking
+Type=simple
 User=__APP__
 Group=__APP__
 WorkingDirectory=__INSTALL_DIR__
@@ -15,12 +15,11 @@ Environment="PORT=__PORT__"
 Environment="ASDF_DIR=/home/__APP__/.asdf"
 Environment="ASDF_DATA_DIR=/home/__APP__/.asdf"
 Environment="PATH=/home/__APP__/.asdf/shims:/home/__APP__/.asdf/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-Environment="RELEASE_TMP=/run/__APP__"
 EnvironmentFile=__INSTALL_DIR__/.env
-RuntimeDirectory=__APP__
-ExecStart=__INSTALL_DIR__/_build/prod/rel/bonfire/bin/bonfire daemon
-PIDFile=/run/__APP__/bonfire.pid
-ExecStop=__INSTALL_DIR__/_build/prod/rel/bonfire/bin/bonfire stop
+ExecStart=/bin/sh -c 'exec __INSTALL_DIR__/_build/prod/rel/bonfire/bin/bonfire start'
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=30
 Restart=on-failure
 RestartSec=10
 TimeoutStartSec=300
