@@ -1,0 +1,90 @@
+version = "1.0"
+
+[main]
+name = "Bonfire configuration"
+
+    [main.email]
+    name = "Email settings"
+
+        [main.email.mail_backend]
+        ask.en = "Email backend"
+        ask.fr = "Backend de messagerie"
+        type = "select"
+        choices = ["smtp", "mailgun", "sendgrid", "none"]
+        default = "smtp"
+        help.en = "Service to use for sending emails. 'smtp' uses YunoHost's local mail server."
+        help.fr = "Service à utiliser pour l'envoi d'emails. 'smtp' utilise le serveur mail local de YunoHost."
+        bind = "MAIL_BACKEND:__INSTALL_DIR__/.env"
+
+        [main.email.mail_server]
+        ask.en = "SMTP server"
+        ask.fr = "Serveur SMTP"
+        type = "string"
+        default = "localhost"
+        help.en = "SMTP server hostname. Default 'localhost' uses YunoHost's postfix."
+        help.fr = "Nom d'hôte du serveur SMTP. 'localhost' par défaut utilise postfix de YunoHost."
+        bind = "MAIL_SERVER:__INSTALL_DIR__/.env"
+
+        [main.email.mail_port]
+        ask.en = "SMTP port"
+        ask.fr = "Port SMTP"
+        type = "number"
+        default = 25
+        help.en = "SMTP server port. Use 25 for local, 587 for external SMTP with STARTTLS, 465 for SMTPS."
+        help.fr = "Port du serveur SMTP. Utilisez 25 pour local, 587 pour SMTP externe avec STARTTLS, 465 pour SMTPS."
+        bind = "MAIL_PORT:__INSTALL_DIR__/.env"
+
+        [main.email.mail_user]
+        ask.en = "SMTP username"
+        ask.fr = "Nom d'utilisateur SMTP"
+        type = "string"
+        optional = true
+        help.en = "SMTP username for authentication. Leave empty for local SMTP."
+        help.fr = "Nom d'utilisateur SMTP pour l'authentification. Laissez vide pour SMTP local."
+        bind = "MAIL_USER:__INSTALL_DIR__/.env"
+
+        [main.email.mail_password]
+        ask.en = "SMTP password"
+        ask.fr = "Mot de passe SMTP"
+        type = "password"
+        optional = true
+        help.en = "SMTP password for authentication. Leave empty for local SMTP."
+        help.fr = "Mot de passe SMTP pour l'authentification. Laissez vide pour SMTP local."
+        bind = "MAIL_PASSWORD:__INSTALL_DIR__/.env"
+
+        [main.email.mail_from]
+        ask.en = "From address"
+        ask.fr = "Adresse d'expéditeur"
+        type = "email"
+        help.en = "Email address to use as sender"
+        help.fr = "Adresse email à utiliser comme expéditeur"
+        bind = "MAIL_FROM:__INSTALL_DIR__/.env"
+
+    [main.instance]
+    name = "Instance settings"
+
+        [main.instance.invite_only]
+        ask.en = "Invite-only registration"
+        ask.fr = "Inscription sur invitation uniquement"
+        type = "boolean"
+        default = true
+        help.en = "Require users to have an invite link to sign up"
+        help.fr = "Exiger que les utilisateurs aient un lien d'invitation pour s'inscrire"
+        bind = "INVITE_ONLY:__INSTALL_DIR__/.env"
+
+        [main.instance.instance_description]
+        ask.en = "Instance description"
+        ask.fr = "Description de l'instance"
+        type = "text"
+        optional = true
+        help.en = "A short description of your Bonfire instance"
+        help.fr = "Une courte description de votre instance Bonfire"
+        bind = "INSTANCE_DESCRIPTION:__INSTALL_DIR__/.env"
+
+        [main.instance.upload_limit]
+        ask.en = "Max upload size"
+        ask.fr = "Taille maximale d'upload"
+        type = "string"
+        help.en = "Maximum file upload size (e.g., 35MB, 100MB)"
+        help.fr = "Taille maximale des fichiers uploadés (ex: 35MB, 100MB)"
+        bind = "UPLOAD_LIMIT:__INSTALL_DIR__/.env"
