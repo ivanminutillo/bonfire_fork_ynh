@@ -25,52 +25,29 @@ ynh_systemd_action --service_name="meilisearch-$app" --action="stop" --log_path=
 
 if [ "$upgrade_type" == "UPGRADE_APP" ]
 then
-	ynh_script_progression --message="Updating Bonfire release..." --weight=5
+	ynh_script_progression --message="Downloading new Bonfire release..." --weight=10
 
-	# Determine architecture
+	# Download and extract new pre-built release
+	ynh_setup_source --dest_dir="$install_dir" --full_replace=1 --keep=".env"
+
+	# The tarball extracts to a "bonfire" subdirectory, move contents up one level
+	if [ -d "$install_dir/bonfire" ]; then
+	    # Move all files from bonfire/ to parent, preserving .env
+	    mv "$install_dir/bonfire/"* "$install_dir/" 2>/dev/null || true
+	    mv "$install_dir/bonfire/".* "$install_dir/" 2>/dev/null || true
+	    rmdir "$install_dir/bonfire"
+	fi
+
+	# Update Meilisearch if needed
 	arch=$(uname -m)
 	if [ "$arch" = "x86_64" ]; then
-	    docker_image="bonfirenetworks/bonfire:latest-social-amd64"
 	    meili_arch="amd64"
 	elif [ "$arch" = "aarch64" ] || [ "$arch" = "arm64" ]; then
-	    docker_image="bonfirenetworks/bonfire:latest-social-aarch64"
 	    meili_arch="aarch64"
 	else
 	    ynh_die --message="Unsupported architecture: $arch"
 	fi
 
-	# Temporarily install Docker to extract new release
-	ynh_print_info "Installing Docker temporarily to extract new Bonfire release..."
-	apt-get install -y docker.io
-
-	# Pull new image
-	docker pull "$docker_image"
-
-	# Create temporary container
-	container_id=$(docker create "$docker_image")
-
-	# Backup current release
-	mv "$install_dir" "$install_dir.backup"
-
-	# Extract new release
-	mkdir -p "$install_dir"
-	docker cp "$container_id:/opt/app/." "$install_dir/"
-
-	# Restore configuration
-	cp "$install_dir.backup/.env" "$install_dir/.env"
-
-	# Remove temporary container and image
-	docker rm "$container_id"
-	docker rmi "$docker_image"
-
-	# Clean up Docker
-	apt-get remove -y docker.io
-	apt-get autoremove -y
-
-	# Remove backup
-	rm -rf "$install_dir.backup"
-
-	# Update Meilisearch
 	meili_version="v1.14.0"
 	curl -L "https://github.com/meilisearch/meilisearch/releases/download/$meili_version/meilisearch-linux-$meili_arch" -o "$install_dir/meilisearch"
 	chmod +x "$install_dir/meilisearch"
@@ -123,24 +100,8 @@ ynh_script_progression --message="Starting systemd services..." --weight=1
 # Start Meilisearch first
 ynh_systemd_action --service_name="meilisearch-$app" --action="start" --log_path="/var/log/$app/meilisearch.log"
 
-# Start Bonfire
-ynh_systemd_action --service_name=$app --action="start" --log_path="/var/log/$app/$app.log"
-
-#=================================================
-# RUN DATABASE MIGRATIONS
-#=================================================
-if [ "$upgrade_type" == "UPGRADE_APP" ]
-then
-	ynh_script_progression --message="Running database migrations..." --weight=3
-
-	# Wait for app to be ready
-	sleep 10
-
-	# Run migrations
-	pushd "$install_dir"
-	su - $app -c "cd $install_dir && ./bin/migrate" || ynh_print_warn "Migrations may need to be run manually."
-	popd
-fi
+# Start Bonfire (migrations run automatically on startup)
+ynh_systemd_action --service_name=$app --action="start" --log_path="/var/log/$app/$app.log" --line_match="Running Bonfire.Web.Endpoint" --timeout=300
 
 #=================================================
 # END OF SCRIPT
