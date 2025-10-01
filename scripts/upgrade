@@ -87,6 +87,13 @@ chown -R $app:www-data "$data_dir"
 #=================================================
 ynh_script_progression --message="Updating a configuration file..."
 
+# Extract existing secrets from current .env file
+if [ -f "$install_dir/.env" ]; then
+	secret_key_base=$(grep "^SECRET_KEY_BASE=" "$install_dir/.env" | cut -d= -f2)
+	signing_salt=$(grep "^SIGNING_SALT=" "$install_dir/.env" | cut -d= -f2)
+	encryption_salt=$(grep "^ENCRYPTION_SALT=" "$install_dir/.env" | cut -d= -f2)
+fi
+
 ynh_add_config --template="../conf/.env" --destination="$install_dir/.env"
 ynh_store_file_checksum --file="$install_dir/.env"
 
