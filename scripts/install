@@ -61,21 +61,22 @@ ynh_script_progression --message="Setting up source files..." --weight=5
 
 ynh_setup_source --dest_dir="$install_dir" --full_replace=1
 
-# Create .tool-versions file for asdf in the project directory BEFORE git init
+# Create .tool-versions file for asdf in the project directory
 echo "elixir 1.17.3-otp-25" > "$install_dir/.tool-versions"
 
-# Initialize git repo (Bonfire build expects git)
-# IMPORTANT: Must be done BEFORE changing permissions so git commit works
+# Set ownership FIRST so the bonfire user can initialize git
+chown -R $app:www-data "$install_dir"
+
+# Initialize git repo as the bonfire user (Bonfire build expects git)
 pushd "$install_dir"
-git init
-git config user.email "bonfire@localhost"
-git config user.name "Bonfire"
-git add .
-git commit -m "Initial Bonfire source" || true
+ynh_exec_as $app git init
+ynh_exec_as $app git config user.email "bonfire@localhost"
+ynh_exec_as $app git config user.name "Bonfire"
+ynh_exec_as $app git add .
+ynh_exec_as $app git commit -m "Initial Bonfire source" || true
 popd
 
 chmod -R o-rwx "$install_dir"
-chown -R $app:www-data "$install_dir"
 
 #=================================================
 # SETUP DIRECTORIES AND PERMISSIONS
