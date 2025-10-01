@@ -116,6 +116,12 @@ meili_master_key=$(ynh_string_random --length=64)
 # max file upload size - convert from "35MB" to bytes "35000000"
 upload_limit_bytes="${media_upload_size//[!0-9]/}000000"
 
+# Set instance configuration from installation questions
+# These variables are automatically available from manifest.toml [install] section:
+# - $instance_name
+# - $invite_only (true/false)
+# - $instance_description (optional)
+
 # Note: .env file will be created after 'just config' runs, as that command
 # deletes .env and creates a symlink to config/prod/.env
 

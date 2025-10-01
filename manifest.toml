@@ -79,6 +79,30 @@ ram.runtime = "1000M"
       ]
     default = "35MB"
 
+  [install.instance_name]
+    ask.en = "Instance name (can be changed later)"
+    ask.fr = "Nom de l'instance (peut être modifié ultérieurement)"
+    type = "string"
+    default = "Bonfire"
+    help.en = "The name of your Bonfire instance that will be displayed to users"
+    help.fr = "Le nom de votre instance Bonfire qui sera affiché aux utilisateurs"
+
+  [install.invite_only]
+    ask.en = "Require invitations to sign up?"
+    ask.fr = "Exiger des invitations pour s'inscrire ?"
+    type = "boolean"
+    default = true
+    help.en = "If enabled, users need an invite link to create an account. You can always invite users from your admin panel."
+    help.fr = "Si activé, les utilisateurs ont besoin d'un lien d'invitation pour créer un compte. Vous pouvez toujours inviter des utilisateurs depuis votre panneau d'administration."
+
+  [install.instance_description]
+    ask.en = "Instance description (optional)"
+    ask.fr = "Description de l'instance (optionnel)"
+    type = "string"
+    optional = true
+    help.en = "A short description of your Bonfire instance"
+    help.fr = "Une courte description de votre instance Bonfire"
+
 [resources]
 
     [resources.system_user]
