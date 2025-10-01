@@ -161,8 +161,21 @@ export AUTO_YES=true
 # Initialize Bonfire configuration
 ynh_exec_warn_less ynh_exec_as $app env ASDF_DIR="$ASDF_DIR" ASDF_DATA_DIR="$ASDF_DATA_DIR" PATH="$PATH" FLAVOUR=social MIX_ENV=prod WITH_DOCKER=no AUTO_YES=true just config
 
-# Setup production environment (installs deps, compiles assets, etc.)
-ynh_exec_warn_less ynh_exec_as $app env ASDF_DIR="$ASDF_DIR" ASDF_DATA_DIR="$ASDF_DATA_DIR" PATH="$PATH" FLAVOUR=social MIX_ENV=prod WITH_DOCKER=no AUTO_YES=true just setup-prod
+# Run build steps manually to patch install scripts between deps fetch and flavour install
+ynh_exec_warn_less ynh_exec_as $app env ASDF_DIR="$ASDF_DIR" ASDF_DATA_DIR="$ASDF_DATA_DIR" PATH="$PATH" FLAVOUR=social MIX_ENV=prod WITH_DOCKER=no just build
+ynh_exec_warn_less ynh_exec_as $app env ASDF_DIR="$ASDF_DIR" ASDF_DATA_DIR="$ASDF_DATA_DIR" PATH="$PATH" FLAVOUR=social MIX_ENV=prod WITH_DOCKER=no just _clone_flavour_apps
+ynh_exec_warn_less ynh_exec_as $app env ASDF_DIR="$ASDF_DIR" ASDF_DATA_DIR="$ASDF_DATA_DIR" PATH="$PATH" FLAVOUR=social MIX_ENV=prod WITH_DOCKER=no just flavour_make_symlinks social
+ynh_exec_warn_less ynh_exec_as $app env ASDF_DIR="$ASDF_DIR" ASDF_DATA_DIR="$ASDF_DATA_DIR" PATH="$PATH" FLAVOUR=social MIX_ENV=prod WITH_DOCKER=no just deps-fetch --only prod
+
+# Now patch the install scripts to respect AUTO_YES environment variable
+sed -i 's/^AUTO_YES=false$/AUTO_YES=${AUTO_YES:-false}/' "$install_dir/extensions/social/install.sh" 2>/dev/null || true
+sed -i 's/^AUTO_YES=false$/AUTO_YES=${AUTO_YES:-false}/' "$install_dir/extensions/ember/install.sh" 2>/dev/null || true
+sed -i 's/^AUTO_YES=false$/AUTO_YES=${AUTO_YES:-false}/' "$install_dir/deps/social/install.sh" 2>/dev/null || true
+sed -i 's/^AUTO_YES=false$/AUTO_YES=${AUTO_YES:-false}/' "$install_dir/deps/ember/install.sh" 2>/dev/null || true
+
+# Continue with the rest of setup-prod-build
+ynh_exec_warn_less ynh_exec_as $app env ASDF_DIR="$ASDF_DIR" ASDF_DATA_DIR="$ASDF_DATA_DIR" PATH="$PATH" FLAVOUR=social MIX_ENV=prod WITH_DOCKER=no AUTO_YES=true just _deps-post-get
+ynh_exec_warn_less ynh_exec_as $app env ASDF_DIR="$ASDF_DIR" ASDF_DATA_DIR="$ASDF_DATA_DIR" PATH="$PATH" FLAVOUR=social MIX_ENV=prod WITH_DOCKER=no AUTO_YES=true just _flavour_install social
 
 # Build the release
 ynh_exec_warn_less ynh_exec_as $app env ASDF_DIR="$ASDF_DIR" ASDF_DATA_DIR="$ASDF_DATA_DIR" PATH="$PATH" FLAVOUR=social MIX_ENV=prod WITH_DOCKER=no AUTO_YES=true just rel-build
