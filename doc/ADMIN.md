@@ -2,31 +2,73 @@
 
 ### First Setup
 
-1. After installation, navigate to your Bonfire domain
-2. Click "Sign up" to create your account
-3. **Important:** The first account created automatically becomes the administrator
+After installation, an admin account is automatically created using:
+- **Username:** The YunoHost user you selected during installation
+- **Email:** The email associated with that YunoHost user
+- **Password:** The password you provided during installation
 
-### Managing Containers
+You can log in immediately at your Bonfire domain.
 
-View container status:
+### Configuring Bonfire Settings
+
+Bonfire provides a **Config Panel** for easy post-installation configuration.
+
+#### Via Web Admin (Recommended)
+
+1. Go to **YunoHost Admin Panel** → **Applications** → **Bonfire** → **Config**
+2. Modify settings in the web interface:
+   - **Email Settings:** SMTP server, port, authentication, from address
+   - **Instance Settings:** Name, invite-only mode, description, upload limits, log level
+   - **Advanced Settings:** Feature flags (image processing, AI features, LiveView native)
+3. Click **Apply** to save changes
+4. Bonfire will automatically restart with new settings
+
+#### Via Command Line
+
 ```bash
-cd /var/www/bonfire
-docker compose ps
+# View current configuration
+yunohost app config get bonfire
+
+# Set a specific value
+yunohost app config set bonfire main.instance.app_name="My Bonfire Instance"
+yunohost app config set bonfire main.instance.log_level="debug"
+yunohost app config set bonfire main.instance.invite_only=false
+
+# Enable/disable features
+yunohost app config set bonfire advanced.features.with_ai=true
+```
+
+### Email Configuration
+
+By default, Bonfire uses **YunoHost's built-in SMTP server** (localhost:25) with no authentication required. Emails are sent from `bonfire@yourdomain.com`.
+
+To use an external SMTP provider (Gmail, SendGrid, etc.):
+
+1. Go to Config Panel → **Email Settings**
+2. Configure:
+   - SMTP server hostname
+   - Port (usually 587 for STARTTLS)
+   - Username and password
+   - From address
+3. Apply changes
+
+### Managing the Service
+
+View service status:
+```bash
+systemctl status bonfire
 ```
 
 View logs:
 ```bash
-docker compose logs -f
-# or
 journalctl -fu bonfire
+# or
+tail -f /var/log/bonfire/bonfire.log
 ```
 
-Restart containers:
+Restart Bonfire:
 ```bash
 systemctl restart bonfire
-# or
-cd /var/www/bonfire
-docker compose restart
 ```
 
 ### Database Access
@@ -36,45 +78,127 @@ Access PostgreSQL database:
 sudo -u postgres psql bonfire
 ```
 
+Common database commands:
+```sql
+-- List all users
+SELECT * FROM bonfire_data_identity_user;
+
+-- Count posts
+SELECT COUNT(*) FROM bonfire_data_social_post;
+```
+
 ### Search Index (Meilisearch)
 
-Check search health:
+Meilisearch runs as a separate systemd service.
+
+Check status:
 ```bash
-docker exec bonfire-bonfire curl http://search:7700/health
+systemctl status meilisearch-bonfire
+```
+
+View logs:
+```bash
+journalctl -fu meilisearch-bonfire
 ```
 
 Rebuild search index (if needed):
 ```bash
-docker exec -it bonfire-bonfire ./bin/bonfire remote
-# In Elixir console:
-Bonfire.Search.Indexer.maybe_reindex_all()
+cd /var/www/bonfire
+sudo -u bonfire /var/www/bonfire/_build/prod/rel/bonfire/bin/bonfire rpc "Bonfire.Search.Indexer.maybe_reindex_all()"
 ```
 
 ### Troubleshooting
 
-**Containers won't start:**
+**Service won't start:**
 ```bash
-# Check PostgreSQL is accessible from Docker
-docker exec bonfire-bonfire psql -h 172.17.0.1 -U bonfire -d bonfire -c "SELECT 1;"
+# Check for errors
+journalctl -u bonfire -n 100
+
+# Check if port is already in use
+ss -tlnp | grep 50160
 ```
 
 **Search not working:**
 ```bash
-# Check meilisearch container
-docker logs bonfire-bonfire-search
+# Check meilisearch service
+systemctl status meilisearch-bonfire
+journalctl -u meilisearch-bonfire -n 50
 ```
 
 **Database connection errors:**
-Check that PostgreSQL is configured to accept connections from Docker network:
 ```bash
-grep "172.17.0.0/16" /etc/postgresql/*/main/pg_hba.conf
+# Test database connection
+sudo -u bonfire psql -h localhost -U bonfire -d bonfire -c "SELECT 1;"
+```
+
+**Email not sending:**
+```bash
+# Check postfix is running (for local SMTP)
+systemctl status postfix
+
+# Test SMTP connection
+telnet localhost 25
+```
+
+### Performance Tuning
+
+#### Increase Upload Limits
+
+Via Config Panel: **Main** → **Instance Settings** → **Max upload size**
+
+Or via CLI:
+```bash
+yunohost app config set bonfire main.instance.upload_limit="100MB"
+```
+
+#### Adjust Logging Level
+
+For production, use `info` level. For debugging issues, use `debug`:
+```bash
+yunohost app config set bonfire main.instance.log_level="debug"
+# Don't forget to set back to "info" when done
+```
+
+#### Database Optimization
+
+```bash
+# Vacuum and analyze database
+sudo -u postgres psql bonfire -c "VACUUM ANALYZE;"
 ```
 
 ### Updating
 
 Updates are handled through YunoHost:
 ```bash
-sudo yunohost app upgrade bonfire
+yunohost app upgrade bonfire
 ```
 
-This will pull the latest Docker images and restart the containers.
+The upgrade process will:
+1. Stop the Bonfire service
+2. Update the application files
+3. Run database migrations
+4. Restart the service
+
+### Backup and Restore
+
+YunoHost automatically handles backups including:
+- Application files
+- Database
+- Configuration files
+- User data
+
+Create manual backup:
+```bash
+yunohost backup create --apps bonfire
+```
+
+Restore from backup:
+```bash
+yunohost backup restore <backup_name>
+```
+
+### Federation and Domain Changes
+
+⚠️ **Warning:** After initial setup, **DO NOT CHANGE YOUR DOMAIN**. This will break federation with other ActivityPub instances.
+
+The domain is permanently tied to your instance's identity in the fediverse.
