@@ -216,7 +216,9 @@ ynh_script_progression --message="Starting Meilisearch service..." --weight=1
 ynh_systemd_action --service_name="meilisearch-$app" --action="start" --log_path="/var/log/$app/meilisearch.log"
 
 ynh_script_progression --message="Starting Bonfire daemon service..." --weight=1
-ynh_systemd_action --service_name=$app --action="start" --log_path="/var/log/$app/$app.log" --line_match="Running Bonfire.Web.Endpoint"
+# Bonfire runs migrations on first start which can take 2-3 minutes
+# Wait for migrations to complete and server to start (default timeout is 90s, we need more)
+ynh_systemd_action --service_name=$app --action="start" --log_path="/var/log/$app/$app.log" --line_match="Running Bonfire.Web.Endpoint" --timeout=300
 
 #=================================================
 # END OF SCRIPT
