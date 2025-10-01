@@ -7,7 +7,7 @@ Requires=meilisearch-__APP__.service
 Type=simple
 User=__APP__
 Group=__APP__
-WorkingDirectory=__INSTALL_DIR__/_build/prod/rel/bonfire/
+WorkingDirectory=__INSTALL_DIR__
 Environment="HOME=/home/__APP__"
 Environment="MIX_ENV=prod"
 Environment="LANG=en_US.UTF-8"
