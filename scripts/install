@@ -130,6 +130,16 @@ yunohost service add "meilisearch-$app" --description="Meilisearch for Bonfire" 
 yunohost service add $app --description="Bonfire daemon" --log="/var/log/$app/$app.log"
 
 #=================================================
+# SETUP FAIL2BAN
+#=================================================
+ynh_script_progression --message="Configuring Fail2Ban..." --weight=1
+
+# Configure Fail2Ban
+# Note: Bonfire logs format may vary - this is a basic pattern
+# TODO: Verify actual Bonfire auth failure log format and adjust regex accordingly
+ynh_config_add_fail2ban --logpath="/var/log/$app/$app.log" --failregex="^.*authentication.*failed.*<HOST>.*$"
+
+#=================================================
 # START SERVICES
 #=================================================
 ynh_script_progression --message="Starting Meilisearch service..." --weight=1
@@ -138,7 +148,7 @@ ynh_systemd_action --service_name="meilisearch-$app" --action="start" --log_path
 ynh_script_progression --message="Starting Bonfire daemon service..." --weight=1
 # Bonfire runs migrations on first start which can take 2-3 minutes
 # Wait for migrations to complete and server to start (default timeout is 90s, we need more)
-ynh_systemd_action --service_name=$app --action="start" --log_path="/var/log/$app/$app.log" --line_match="Running Bonfire.Web.Endpoint" --timeout=300
+ynh_systemd_action --service_name=$app --action="start" --log_path=systemd --line_match="Running Bonfire.Web.Endpoint" --timeout=300
 
 #=================================================
 # CREATE ADMIN USER
