@@ -189,8 +189,15 @@ sudo -u $app env HOME=$install_dir \
     ynh_print_warn "Migration command failed, will retry on service start"
 }
 
-# Give some time after migrations
+# Give some time after migrations and clean up any leftover processes
 sleep 5
+
+ynh_script_progression --message="Cleaning up any leftover Erlang processes..." --weight=1
+# Kill any leftover Erlang processes from previous attempts
+pkill -u $app -f beam.smp || true
+pkill -u $app epmd || true
+pkill -u $app erl_child_setup || true
+sleep 2
 
 ynh_script_progression --message="Starting Bonfire daemon service..." --weight=1
 # Start the service
