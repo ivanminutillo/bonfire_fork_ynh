@@ -93,6 +93,13 @@ chmod +x "$install_dir/meilisearch"
 
 # Create meilisearch data directory
 mkdir -p "$data_dir/meilisearch"
+mkdir -p "$data_dir/meilisearch/dumps"
+chown -R $app:$app "$data_dir/meilisearch"
+chmod 750 "$data_dir/meilisearch"
+
+# Create log directory for both services
+mkdir -p "/var/log/$app"
+chown -R $app:$app "/var/log/$app"
 
 #=================================================
 # ADD CONFIGURATION
@@ -149,6 +156,16 @@ ynh_add_fail2ban_config --logpath="/var/log/$app/$app.log" --failregex="^.*authe
 #=================================================
 ynh_script_progression --message="Starting Meilisearch service..." --weight=1
 ynh_systemd_action --service_name="meilisearch-$app" --action="start" --log_path="/var/log/$app/meilisearch.log"
+
+# Wait for Meilisearch to be ready
+ynh_script_progression --message="Waiting for Meilisearch to be ready..." --weight=1
+for i in {1..30}; do
+    if curl -s "http://localhost:7700/health" | grep -q "available"; then
+        ynh_print_info "Meilisearch is ready"
+        break
+    fi
+    sleep 1
+done
 
 #=================================================
 # RUN DATABASE MIGRATIONS

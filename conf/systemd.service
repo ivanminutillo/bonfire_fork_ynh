@@ -1,7 +1,8 @@
 [Unit]
 Description=Bonfire social networking server
 After=network.target postgresql.service meilisearch-__APP__.service
-Requires=meilisearch-__APP__.service
+Wants=postgresql.service meilisearch-__APP__.service
+BindsTo=meilisearch-__APP__.service
 
 [Service]
 Type=simple
