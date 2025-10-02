@@ -151,23 +151,6 @@ ynh_script_progression --message="Starting Bonfire daemon service..." --weight=1
 ynh_systemd_action --service_name=$app --action="start" --log_path=systemd --line_match="Running Bonfire.Web.Endpoint" --timeout=300
 
 #=================================================
-# CREATE ADMIN USER
-#=================================================
-ynh_script_progression --message="Creating admin user account..." --weight=1
-
-# Get admin email from YunoHost
-admin_email=$(ynh_user_get_info --username="$admin" --key=mail)
-
-# Create admin account in Bonfire using RPC to the running service
-pushd "$install_dir"
-# Wait a moment for the service to be fully ready for RPC
-sleep 3
-# Create user and promote to admin
-ynh_exec_warn_less ynh_exec_as $app "$install_dir/bin/bonfire" rpc "Bonfire.Me.make_account_and_user(\"$admin\", \"$admin_email\", \"$password\")"
-ynh_exec_warn_less ynh_exec_as $app "$install_dir/bin/bonfire" rpc "Bonfire.Me.Users.make_admin(\"$admin\")"
-popd
-
-#=================================================
 # SETUP NGINX CONFIGURATION
 #=================================================
 ynh_script_progression --message="Configuring NGINX web server..." --weight=1
@@ -179,4 +162,19 @@ ynh_add_nginx_config
 #=================================================
 
 ynh_script_progression --message="Installation of $app completed" --weight=1
-ynh_script_progression --message="Admin account created: $admin (email: $admin_email)" --last
+
+# Display post-install instructions
+message="Bonfire has been successfully installed!
+
+IMPORTANT: You need to create your admin account.
+
+Please visit: https://$domain/
+And sign up with your desired username and email address.
+
+Note: The first user to sign up will automatically become an instance administrator.
+
+If you set your instance to 'invite only' during installation, you can still access the signup page directly."
+
+ynh_send_readme_to_admin --app_message="$message" --type="install"
+
+ynh_script_progression --message="Please visit https://$domain/ to create your admin account" --last
