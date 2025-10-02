@@ -107,6 +107,7 @@ ram.runtime = "1000M"
     # and store the corresponding setting $data_dir
 
     [resources.ports]
+    # Port will be automatically assigned by YunoHost
 
     [resources.permissions]
     main.url = "/"
