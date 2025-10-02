@@ -15,7 +15,8 @@ Environment="MIX_ENV=prod"
 Environment="LANG=en_US.UTF-8"
 WorkingDirectory=__INSTALL_DIR__
 EnvironmentFile=__INSTALL_DIR__/.env
-ExecStartPre=/bin/sh -c 'pkill -u __APP__ beam.smp || true; pkill -u __APP__ epmd || true; pkill -u __APP__ erl_child_setup || true; sleep 2'
+ExecStartPre=-/usr/bin/pkill -u __APP__ -f beam.smp
+ExecStartPre=-/usr/bin/pkill -u __APP__ epmd
 ExecStart=__INSTALL_DIR__/bin/bonfire start
 ExecStopPost=/bin/sh -c 'sleep 2; pkill -9 -u __APP__ beam.smp || true; pkill -9 -u __APP__ epmd || true; pkill -9 -u __APP__ erl_child_setup || true'
 KillMode=control-group

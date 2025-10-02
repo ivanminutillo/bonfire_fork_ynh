@@ -189,31 +189,43 @@ sudo -u $app env HOME=$install_dir \
     ynh_print_warn "Migration command failed, will retry on service start"
 }
 
+# Give some time after migrations
+sleep 5
+
 ynh_script_progression --message="Starting Bonfire daemon service..." --weight=1
 # Start the service
 ynh_systemd_action --service_name=$app --action="start"
 
-# Monitor service startup for 60 seconds
-ynh_script_progression --message="Waiting for Bonfire to complete migrations and start up (checking for up to 60 seconds)..." --weight=5
+# Monitor service startup and wait for port to be listening
+ynh_script_progression --message="Waiting for Bonfire to start up and bind to port $port..." --weight=5
 
-for i in {1..12}; do
-    sleep 5
-    if systemctl is-active --quiet $app; then
-        ynh_print_info "Bonfire service is running (checked after $((i*5)) seconds)"
-        # Give it a bit more time to finish migrations
-        sleep 30
+startup_success=false
+for i in {1..20}; do
+    sleep 3
+
+    # Check if service is active
+    if ! systemctl is-active --quiet $app; then
+        ynh_print_warn "Bonfire service not running (attempt $i/20), restarting..."
+        systemctl restart $app || true
+        continue
+    fi
+
+    # Check if port is listening
+    if netstat -tulpn 2>/dev/null | grep -q ":$port "; then
+        ynh_print_info "Bonfire is successfully listening on port $port!"
+        startup_success=true
         break
     else
-        ynh_print_warn "Bonfire service not yet stable (attempt $i/12)..."
-        if [ $i -eq 12 ]; then
-            ynh_print_err "Bonfire service failed to start after 60 seconds"
-            ynh_print_err "Last 50 lines of journalctl:"
-            journalctl -u $app -n 50 --no-pager >&2 || true
-            ynh_print_err "You can check logs with: journalctl -u $app -n 100"
-            # Don't fail installation, continue to show post-install message
-        fi
+        ynh_print_warn "Bonfire running but not yet listening on port $port (attempt $i/20)..."
     fi
 done
+
+if [ "$startup_success" = false ]; then
+    ynh_print_err "Bonfire service failed to bind to port $port after 60 seconds"
+    ynh_print_err "Last 30 lines of journalctl:"
+    journalctl -u $app -n 30 --no-pager >&2 || true
+    ynh_print_warn "Installation continuing, but service may need manual intervention"
+fi
 
 #=================================================
 # SETUP NGINX CONFIGURATION
