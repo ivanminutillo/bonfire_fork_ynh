@@ -129,7 +129,11 @@ ram.runtime = "1000M"
 
     [resources.apt]
     # Runtime dependencies only (pre-built release includes Erlang/Elixir)
-    packages = "postgresql postgresql-contrib postgresql-15-postgis-3 curl ca-certificates git imagemagick libvips-tools poppler-utils ffmpeg libssl1.1"
+    packages = "postgresql postgresql-contrib postgresql-15-postgis-3 curl ca-certificates git imagemagick libvips-tools poppler-utils ffmpeg"
+
+    [resources.sources.libssl]
+    amd64.url = "http://security.debian.org/debian-security/pool/updates/main/o/openssl/libssl1.1_1.1.1w-0+deb11u1_amd64.deb"
+    amd64.sha256 = "eb6372996b6d58cb31da3d49c16894cd7ddac3a02816a8cb1c62810e17d2ac47"
 
     [resources.database]
     type = "postgresql"
