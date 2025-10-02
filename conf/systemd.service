@@ -4,7 +4,7 @@ After=network.target postgresql.service meilisearch-__APP__.service
 Requires=meilisearch-__APP__.service
 
 [Service]
-Type=exec
+Type=simple
 User=__APP__
 Group=__APP__
 Environment="HOME=__INSTALL_DIR__"
@@ -12,9 +12,9 @@ Environment="MIX_ENV=prod"
 Environment="LANG=en_US.UTF-8"
 WorkingDirectory=__INSTALL_DIR__
 EnvironmentFile=__INSTALL_DIR__/.env
-ExecStart=__INSTALL_DIR__/bin/bonfire start
-ExecStop=__INSTALL_DIR__/bin/bonfire stop
-KillMode=mixed
+ExecStartPre=/bin/sh -c 'pkill -u __APP__ epmd || true'
+ExecStart=__INSTALL_DIR__/bonfire-start.sh
+KillMode=control-group
 KillSignal=SIGTERM
 TimeoutStopSec=30
 StandardInput=null

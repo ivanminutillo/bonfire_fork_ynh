@@ -123,6 +123,11 @@ ynh_use_logrotate
 # Create Meilisearch systemd service
 ynh_add_systemd_config --service="meilisearch-$app" --template="meilisearch.service"
 
+# Install startup wrapper script
+ynh_add_config --template="bonfire-start.sh" --destination="$install_dir/bonfire-start.sh"
+chmod +x "$install_dir/bonfire-start.sh"
+chown $app:$app "$install_dir/bonfire-start.sh"
+
 # Create Bonfire systemd config
 ynh_add_systemd_config
 
