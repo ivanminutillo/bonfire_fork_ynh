@@ -132,6 +132,8 @@ ram.runtime = "1000M"
     packages = "postgresql postgresql-contrib postgresql-15-postgis-3 curl ca-certificates git imagemagick libvips-tools poppler-utils ffmpeg"
 
     [resources.sources.libssl]
+    extract = false
+    rename = "libssl1.1.deb"
     amd64.url = "http://ftp.debian.org/debian/pool/main/o/openssl/libssl1.1_1.1.1w-0+deb11u1_amd64.deb"
     amd64.sha256 = "aadf8b4b197335645b230c2839b4517aa444fd2e8f434e5438c48a18857988f7"
 
