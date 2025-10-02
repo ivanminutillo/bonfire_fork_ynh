@@ -3,6 +3,8 @@ Description=Bonfire social networking server
 After=network.target postgresql.service meilisearch-__APP__.service
 Wants=postgresql.service meilisearch-__APP__.service
 BindsTo=meilisearch-__APP__.service
+StartLimitBurst=3
+StartLimitIntervalSec=120
 
 [Service]
 Type=simple
@@ -22,8 +24,6 @@ TimeoutStopSec=30
 StandardInput=null
 Restart=on-failure
 RestartSec=30
-StartLimitBurst=3
-StartLimitIntervalSec=120
 TimeoutStartSec=300
 StandardOutput=journal
 StandardError=journal
