@@ -148,8 +148,16 @@ ynh_script_progression --message="Creating admin user account..." --weight=1
 # Get admin email from YunoHost
 admin_email=$(ynh_user_get_info --username="$admin" --key=mail)
 
-# Create admin account in Bonfire using RPC eval
+# Wait for Erlang distribution to be ready (retry RPC ping up to 30 seconds)
 pushd "$install_dir"
+for i in {1..30}; do
+    if ynh_exec_as $app env PATH="$PATH" "$install_dir/bin/bonfire" rpc "Node.ping(Node.self())" &>/dev/null; then
+        break
+    fi
+    sleep 1
+done
+
+# Create admin account in Bonfire using RPC eval
 ynh_exec_warn_less ynh_exec_as $app env PATH="$PATH" "$install_dir/bin/bonfire" rpc "Bonfire.Me.make_account_and_user(\"$admin\", \"$admin_email\", \"$password\")"
 popd
 
