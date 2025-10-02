@@ -147,8 +147,30 @@ ynh_systemd_action --service_name="meilisearch-$app" --action="start" --log_path
 
 ynh_script_progression --message="Starting Bonfire daemon service..." --weight=1
 # Bonfire runs migrations on first start which can take 2-3 minutes
-# Wait for migrations to complete and server to start (default timeout is 90s, we need more)
-ynh_systemd_action --service_name=$app --action="start" --log_path=systemd --line_match="Running Bonfire.Web.Endpoint" --timeout=300
+# Start the service
+ynh_systemd_action --service_name=$app --action="start"
+
+# Monitor service startup for 60 seconds
+ynh_script_progression --message="Waiting for Bonfire to complete migrations and start up (checking for up to 60 seconds)..." --weight=5
+
+for i in {1..12}; do
+    sleep 5
+    if systemctl is-active --quiet $app; then
+        ynh_print_info "Bonfire service is running (checked after $((i*5)) seconds)"
+        # Give it a bit more time to finish migrations
+        sleep 30
+        break
+    else
+        ynh_print_warn "Bonfire service not yet stable (attempt $i/12)..."
+        if [ $i -eq 12 ]; then
+            ynh_print_err "Bonfire service failed to start after 60 seconds"
+            ynh_print_err "Last 50 lines of journalctl:"
+            journalctl -u $app -n 50 --no-pager >&2 || true
+            ynh_print_err "You can check logs with: journalctl -u $app -n 100"
+            # Don't fail installation, continue to show post-install message
+        fi
+    fi
+done
 
 #=================================================
 # SETUP NGINX CONFIGURATION
@@ -175,6 +197,7 @@ Note: The first user to sign up will automatically become an instance administra
 
 If you set your instance to 'invite only' during installation, you can still access the signup page directly."
 
-ynh_send_readme_to_admin --app_message="$message" --type="install"
+ynh_script_progression --message="Installation of $app completed" --last
 
-ynh_script_progression --message="Please visit https://$domain/ to create your admin account" --last
+# Print the message to the admin
+echo "$message" >&2

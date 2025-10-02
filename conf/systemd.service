@@ -4,49 +4,33 @@ After=network.target postgresql.service meilisearch-__APP__.service
 Requires=meilisearch-__APP__.service
 
 [Service]
-Type=simple
+Type=exec
 User=__APP__
 Group=__APP__
 Environment="HOME=__INSTALL_DIR__"
 Environment="MIX_ENV=prod"
 Environment="LANG=en_US.UTF-8"
-Environment="PORT=__PORT__"
 WorkingDirectory=__INSTALL_DIR__
 EnvironmentFile=__INSTALL_DIR__/.env
 ExecStart=__INSTALL_DIR__/bin/bonfire start
 ExecStop=__INSTALL_DIR__/bin/bonfire stop
-KillMode=process
+KillMode=mixed
 KillSignal=SIGTERM
 TimeoutStopSec=30
 StandardInput=null
 Restart=on-failure
 RestartSec=10
 TimeoutStartSec=300
-StandardOutput=append:/var/log/__APP__/__APP__.log
-StandardError=inherit
+StandardOutput=journal
+StandardError=journal
 SyslogIdentifier=__APP__
 
 # Security hardening
 NoNewPrivileges=true
 PrivateTmp=true
-PrivateDevices=yes
-RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
-RestrictRealtime=true
-RestrictSUIDSGID=true
-RestrictNamespaces=yes
-LockPersonality=yes
-RemoveIPC=yes
 ProtectSystem=strict
 ProtectHome=true
-ProtectKernelTunables=true
-ProtectKernelModules=true
-ProtectKernelLogs=yes
-ProtectControlGroups=true
-ProtectProc=invisible
 ReadWritePaths=__DATA_DIR__ /var/log/__APP__ __INSTALL_DIR__
-SystemCallFilter=@system-service
-SystemCallFilter=~@privileged
-SystemCallErrorNumber=EPERM
 
 [Install]
 WantedBy=multi-user.target
