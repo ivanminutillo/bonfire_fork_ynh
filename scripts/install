@@ -158,9 +158,13 @@ ynh_script_progression --message="Creating admin user account..." --weight=1
 # Get admin email from YunoHost
 admin_email=$(ynh_user_get_info --username="$admin" --key=mail)
 
-# Create admin account in Bonfire using eval (doesn't require running node)
+# Create admin account in Bonfire using RPC to the running service
 pushd "$install_dir"
-ynh_exec_warn_less ynh_exec_as $app env HOME="$install_dir" PATH="$PATH" "$install_dir/bin/bonfire" eval "Bonfire.Me.make_account_and_user(\"$admin\", \"$admin_email\", \"$password\")"
+# Wait a moment for the service to be fully ready for RPC
+sleep 3
+# Create user and promote to admin
+ynh_exec_warn_less ynh_exec_as $app "$install_dir/bin/bonfire" rpc "Bonfire.Me.make_account_and_user(\"$admin\", \"$admin_email\", \"$password\")"
+ynh_exec_warn_less ynh_exec_as $app "$install_dir/bin/bonfire" rpc "Bonfire.Me.Users.make_admin(\"$admin\")"
 popd
 
 #=================================================
