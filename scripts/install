@@ -200,20 +200,30 @@ pkill -u $app erl_child_setup || true
 sleep 2
 
 ynh_script_progression --message="Starting Bonfire daemon service..." --weight=1
-# Start the service
-ynh_systemd_action --service_name=$app --action="start"
+# Reset any failed state from previous attempts
+systemctl reset-failed $app 2>/dev/null || true
+# Start the service with a longer timeout
+ynh_systemd_action --service_name=$app --action="start" --timeout=30 || true
 
 # Monitor service startup and wait for port to be listening
 ynh_script_progression --message="Waiting for Bonfire to start up and bind to port $port..." --weight=5
 
 startup_success=false
 for i in {1..20}; do
-    sleep 3
+    sleep 5
 
     # Check if service is active
     if ! systemctl is-active --quiet $app; then
-        ynh_print_warn "Bonfire service not running (attempt $i/20), restarting..."
+        if [ $i -gt 1 ]; then
+            ynh_print_warn "Bonfire service not running (attempt $i/20), checking logs..."
+            # Show last few lines of journal to understand the issue
+            journalctl -u $app -n 10 --no-pager | tail -5 >&2 || true
+        fi
+
+        # Reset failed state before attempting restart
+        systemctl reset-failed $app 2>/dev/null || true
         systemctl restart $app || true
+        sleep 5
         continue
     fi
 
