@@ -6,8 +6,6 @@ After=network.target
 Type=simple
 User=__APP__
 Group=__APP__
-# WorkingDirectory causes issues with systemd security settings
-# WorkingDirectory=__DATA_DIR__/meilisearch
 Environment="MEILI_DB_PATH=__DATA_DIR__/meilisearch"
 Environment="MEILI_HTTP_ADDR=127.0.0.1:7700"
 Environment="MEILI_MASTER_KEY=__MEILI_MASTER_KEY__"
@@ -16,12 +14,6 @@ Environment="MEILI_ENV=production"
 ExecStart=__INSTALL_DIR__/meilisearch
 Restart=on-failure
 RestartSec=5
-StandardOutput=append:/var/log/__APP__/meilisearch.log
-StandardError=inherit
-
-# Basic security - simplified to avoid CHDIR issues
-NoNewPrivileges=true
-PrivateTmp=true
 
 [Install]
 WantedBy=multi-user.target
